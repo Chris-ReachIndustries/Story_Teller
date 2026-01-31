@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <rect width="300" height="400" fill="#0f0f23"/>
+  <defs>
+    <linearGradient id="aurora" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ff87"/>
+      <stop offset="50%" style="stop-color:#60efff"/>
+      <stop offset="100%" style="stop-color:#ff00ff"/>
+    </linearGradient>
+  </defs>
+  <path d="M0,100 Q50,50 100,100 Q150,150 200,80 Q250,10 300,60 L300,200 Q250,150 200,180 Q150,210 100,160 Q50,110 0,150 Z" fill="url(#aurora)" opacity="0.6"/>
+  <path d="M0,150 Q75,100 150,150 Q225,200 300,120 L300,250 Q225,180 150,220 Q75,260 0,200 Z" fill="url(#aurora)" opacity="0.4"/>
+  <circle cx="50" cy="300" r="2" fill="#fff"/>
+  <circle cx="150" cy="350" r="1" fill="#fff"/>
+  <circle cx="250" cy="320" r="2" fill="#fff"/>
+  <circle cx="100" cy="380" r="1" fill="#fff"/>
+  <circle cx="200" cy="360" r="1" fill="#fff"/>
+</svg>

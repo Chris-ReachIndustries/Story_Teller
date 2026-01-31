@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <defs>
+    <linearGradient id="sunset" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="30%" style="stop-color:#feca57"/>
+      <stop offset="60%" style="stop-color:#ff9f43"/>
+      <stop offset="100%" style="stop-color:#341f97"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#sunset)"/>
+  <circle cx="150" cy="250" r="60" fill="#feca57" opacity="0.9"/>
+  <circle cx="150" cy="250" r="45" fill="#ff9f43"/>
+  <ellipse cx="150" cy="380" rx="120" ry="30" fill="#341f97" opacity="0.5"/>
+  <rect x="0" y="350" width="300" height="50" fill="#1a1a2e" opacity="0.3"/>
+</svg>

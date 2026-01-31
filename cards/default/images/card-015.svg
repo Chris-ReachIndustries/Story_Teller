@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <defs>
+    <linearGradient id="twilight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50"/>
+      <stop offset="50%" style="stop-color:#8e44ad"/>
+      <stop offset="100%" style="stop-color:#1a1a2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#twilight)"/>
+  <g fill="#27ae60" opacity="0.8">
+    <ellipse cx="50" cy="380" rx="40" ry="25"/>
+    <ellipse cx="120" cy="370" rx="35" ry="22"/>
+    <ellipse cx="180" cy="385" rx="45" ry="20"/>
+    <ellipse cx="250" cy="375" rx="38" ry="28"/>
+  </g>
+  <g>
+    <circle cx="70" cy="320" r="8" fill="#e74c3c"/>
+    <circle cx="130" cy="300" r="6" fill="#f1c40f"/>
+    <circle cx="180" cy="330" r="7" fill="#9b59b6"/>
+    <circle cx="230" cy="310" r="9" fill="#e74c3c"/>
+    <circle cx="100" cy="350" r="5" fill="#3498db"/>
+  </g>
+  <circle cx="50" cy="50" r="2" fill="#fff" opacity="0.6"/>
+  <circle cx="250" cy="80" r="1.5" fill="#fff" opacity="0.5"/>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <rect width="300" height="400" fill="#0f4c75"/>
+  <circle cx="150" cy="200" r="90" fill="none" stroke="#3282b8" stroke-width="3"/>
+  <line x1="150" y1="110" x2="150" y2="200" stroke="#bbe1fa" stroke-width="4"/>
+  <line x1="150" y1="200" x2="210" y2="240" stroke="#bbe1fa" stroke-width="3"/>
+  <circle cx="150" cy="200" r="10" fill="#1b262c"/>
+  <circle cx="150" cy="200" r="5" fill="#bbe1fa"/>
+  <!-- Hour markers instead of text -->
+  <circle cx="150" cy="120" r="6" fill="#bbe1fa"/>
+  <circle cx="230" cy="200" r="5" fill="#bbe1fa"/>
+  <circle cx="150" cy="280" r="5" fill="#bbe1fa"/>
+  <circle cx="70" cy="200" r="5" fill="#bbe1fa"/>
+  <!-- Small tick marks -->
+  <circle cx="190" cy="130" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="220" cy="160" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="220" cy="240" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="190" cy="270" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="110" cy="270" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="80" cy="240" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="80" cy="160" r="3" fill="#bbe1fa" opacity="0.6"/>
+  <circle cx="110" cy="130" r="3" fill="#bbe1fa" opacity="0.6"/>
+</svg>

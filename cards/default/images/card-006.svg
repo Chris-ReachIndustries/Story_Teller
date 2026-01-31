@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <defs>
+    <linearGradient id="cave" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50"/>
+      <stop offset="100%" style="stop-color:#1a1a2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#cave)"/>
+  <polygon points="50,400 80,250 60,400" fill="#9b59b6" opacity="0.8"/>
+  <polygon points="100,400 140,200 120,400" fill="#8e44ad" opacity="0.9"/>
+  <polygon points="150,400 200,150 170,400" fill="#9b59b6"/>
+  <polygon points="200,400 250,220 220,400" fill="#8e44ad" opacity="0.8"/>
+  <polygon points="240,400 280,280 260,400" fill="#9b59b6" opacity="0.7"/>
+  <polygon points="70,0 100,120 40,0" fill="#e74c3c" opacity="0.6"/>
+  <polygon points="180,0 220,150 140,0" fill="#c0392b" opacity="0.7"/>
+  <circle cx="100" cy="180" r="5" fill="#fff" opacity="0.8"/>
+  <circle cx="200" cy="140" r="3" fill="#fff" opacity="0.6"/>
+</svg>

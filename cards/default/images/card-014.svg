@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <defs>
+    <linearGradient id="bubblebg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a29bfe"/>
+      <stop offset="100%" style="stop-color:#6c5ce7"/>
+    </linearGradient>
+    <radialGradient id="bubble">
+      <stop offset="0%" style="stop-color:#fff;stop-opacity:0.8"/>
+      <stop offset="70%" style="stop-color:#fff;stop-opacity:0.1"/>
+      <stop offset="100%" style="stop-color:#fff;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#bubblebg)"/>
+  <circle cx="80" cy="100" r="40" fill="url(#bubble)"/>
+  <circle cx="200" cy="80" r="25" fill="url(#bubble)"/>
+  <circle cx="150" cy="180" r="50" fill="url(#bubble)"/>
+  <circle cx="60" cy="250" r="30" fill="url(#bubble)"/>
+  <circle cx="220" cy="220" r="35" fill="url(#bubble)"/>
+  <circle cx="120" cy="320" r="45" fill="url(#bubble)"/>
+  <circle cx="250" cy="340" r="28" fill="url(#bubble)"/>
+  <circle cx="40" cy="380" r="20" fill="url(#bubble)"/>
+</svg>
