@@ -16,7 +16,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LOCAL_AI_URL=${LOCAL_AI_URL:-http://ollama:11434}
       - AI_MODEL=${AI_MODEL:-}
-      - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-}
+      - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-180000}
       - AI_MAX_TOKENS=${AI_MAX_TOKENS:-250}
       - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
       - AI_THUMB_WIDTH=${AI_THUMB_WIDTH:-320}
@@ -52,10 +52,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     deploy:
       resources:
         reservations:

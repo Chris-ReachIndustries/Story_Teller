@@ -38,7 +38,7 @@ func NewOllamaClient(config OllamaConfig) *OllamaClient {
 		config.Temperature = 0.7
 	}
 	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second // Longer timeout for local inference
+		config.Timeout = 180 * time.Second // Longer timeout for local vision inference (5 images)
 	}
 	if config.BaseURL == "" {
 		config.BaseURL = "http://ollama:11434"
