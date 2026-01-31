@@ -701,19 +701,7 @@ func (h *Hub) broadcastRoomState(roomCode string) {
 	}
 	h.mu.RUnlock()
 
-	room.Mu.RLock()
-	playerCount := len(room.Players)
-	room.Mu.RUnlock()
-
-	log.Printf("[Broadcast #%d] Room %s: sending to %d clients, room has %d players", broadcastID, roomCode, len(clients), playerCount)
-
 	for _, client := range clients {
-		clientPlayer := client.GetPlayer()
-		playerName := "unknown"
-		if clientPlayer != nil {
-			playerName = clientPlayer.Name
-		}
-		log.Printf("[Broadcast #%d] Sending state to client: %s", broadcastID, playerName)
 		h.sendClientStateWithToken(client, room, false)
 	}
 }
@@ -847,7 +835,6 @@ func (h *Hub) sendClientStateWithToken(client *Client, room *game.Room, includeT
 		}
 	}
 
-	log.Printf("[SendState] Sending to %s: %d players in payload", player.Name, len(state.Players))
 	client.Send(&Message{
 		Type:    MsgState,
 		Payload: state,
@@ -922,26 +909,22 @@ func (h *Hub) processSingleBotAction(room *game.Room) bool {
 
 // botStorytell has a bot submit a storyteller clue
 func (h *Hub) botStorytell(room *game.Room, bot *game.Player) bool {
-	log.Printf("[Bot] %s storytelling", bot.Name)
-
 	hand, err := h.getHandWithThumbs(bot)
 	if err != nil {
-		log.Printf("[Bot] Failed to get thumbnails: %v, using fallback", err)
 		return h.botStorytellFallback(room, bot)
 	}
 
 	resp, err := h.aiClient.Storytell(hand)
 	if err != nil || resp.SelectedCard < 1 || resp.SelectedCard > len(bot.Hand) || resp.Clue == "" {
-		log.Printf("[Bot] AI storytell failed: %v, using fallback", err)
 		return h.botStorytellFallback(room, bot)
 	}
 
 	cardID := bot.Hand[resp.SelectedCard-1].ID
 	if err := room.SubmitStorytellerClue(bot.ID, resp.Clue, cardID); err != nil {
-		log.Printf("[Bot] Failed to submit clue: %v", err)
+		log.Printf("[Bot] ERROR: %s failed to submit clue: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s submitted AI clue: \"%s\"", bot.Name, resp.Clue)
+	log.Printf("[Bot] %s → clue: \"%s\"", bot.Name, resp.Clue)
 	return true
 }
 
@@ -954,35 +937,31 @@ func (h *Hub) botStorytellFallback(room *game.Room, bot *game.Player) bool {
 	clue := clues[rand.Intn(len(clues))]
 
 	if err := room.SubmitStorytellerClue(bot.ID, clue, bot.Hand[cardIdx].ID); err != nil {
-		log.Printf("[Bot] Fallback storytell failed: %v", err)
+		log.Printf("[Bot] ERROR: %s fallback failed: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s submitted fallback clue: %s", bot.Name, clue)
+	log.Printf("[Bot] %s → clue: \"%s\" (fallback)", bot.Name, clue)
 	return true
 }
 
 // botSubmitCard has a bot submit a card for the clue
 func (h *Hub) botSubmitCard(room *game.Room, bot *game.Player) bool {
-	log.Printf("[Bot] %s submitting card", bot.Name)
-
 	hand, err := h.getHandWithThumbs(bot)
 	if err != nil {
-		log.Printf("[Bot] Failed to get thumbnails: %v, using fallback", err)
 		return h.botSubmitFallback(room, bot)
 	}
 
 	resp, err := h.aiClient.Submit(hand, room.State.Clue)
 	if err != nil || resp.SelectedCard < 1 || resp.SelectedCard > len(bot.Hand) {
-		log.Printf("[Bot] AI submit failed: %v, using fallback", err)
 		return h.botSubmitFallback(room, bot)
 	}
 
 	cardID := bot.Hand[resp.SelectedCard-1].ID
 	if err := room.SubmitCard(bot.ID, cardID); err != nil {
-		log.Printf("[Bot] Failed to submit card: %v", err)
+		log.Printf("[Bot] ERROR: %s failed to submit: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s submitted card via AI (chose card %d for clue \"%s\")", bot.Name, resp.SelectedCard, room.State.Clue)
+	log.Printf("[Bot] %s → submitted card %d", bot.Name, resp.SelectedCard)
 	return true
 }
 
@@ -992,17 +971,15 @@ func (h *Hub) botSubmitFallback(room *game.Room, bot *game.Player) bool {
 	}
 	cardIdx := rand.Intn(len(bot.Hand))
 	if err := room.SubmitCard(bot.ID, bot.Hand[cardIdx].ID); err != nil {
-		log.Printf("[Bot] Fallback submit failed: %v", err)
+		log.Printf("[Bot] ERROR: %s fallback submit failed: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s submitted fallback card", bot.Name)
+	log.Printf("[Bot] %s → submitted card (fallback)", bot.Name)
 	return true
 }
 
 // botVote has a bot vote for a card
 func (h *Hub) botVote(room *game.Room, bot *game.Player) bool {
-	log.Printf("[Bot] %s voting", bot.Name)
-
 	// Find bot's own submission index (can't vote for self)
 	ownIndex := -1
 	for i, sub := range room.State.Submissions {
@@ -1014,22 +991,20 @@ func (h *Hub) botVote(room *game.Room, bot *game.Player) bool {
 
 	thumbs, err := h.getSubmissionThumbs(room.State.Submissions)
 	if err != nil {
-		log.Printf("[Bot] Failed to get thumbnails: %v, using fallback", err)
 		return h.botVoteFallback(room, bot, ownIndex)
 	}
 
 	resp, err := h.aiClient.Vote(thumbs, room.State.Clue, ownIndex)
 	if err != nil || resp.SelectedCard < 1 || resp.SelectedCard > len(room.State.Submissions) || resp.SelectedCard == ownIndex {
-		log.Printf("[Bot] AI vote failed: %v, using fallback", err)
 		return h.botVoteFallback(room, bot, ownIndex)
 	}
 
 	// Convert to 0-indexed
 	if err := room.Vote(bot.ID, resp.SelectedCard-1); err != nil {
-		log.Printf("[Bot] Failed to vote: %v", err)
+		log.Printf("[Bot] ERROR: %s failed to vote: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s voted via AI (chose card %d)", bot.Name, resp.SelectedCard)
+	log.Printf("[Bot] %s → voted for card %d", bot.Name, resp.SelectedCard)
 
 	// Check if we need to calculate scores (bot's vote may have been the last one)
 	h.checkAndCalculateScores(room)
@@ -1050,10 +1025,10 @@ func (h *Hub) botVoteFallback(room *game.Room, bot *game.Player, ownIndex int) b
 	}
 	voteIdx := validIndices[rand.Intn(len(validIndices))]
 	if err := room.Vote(bot.ID, voteIdx); err != nil {
-		log.Printf("[Bot] Fallback vote failed: %v", err)
+		log.Printf("[Bot] ERROR: %s fallback vote failed: %v", bot.Name, err)
 		return false
 	}
-	log.Printf("[Bot] %s voted via FALLBACK (random card %d)", bot.Name, voteIdx+1)
+	log.Printf("[Bot] %s → voted for card %d (fallback)", bot.Name, voteIdx+1)
 
 	// Check if we need to calculate scores (bot's vote may have been the last one)
 	h.checkAndCalculateScores(room)

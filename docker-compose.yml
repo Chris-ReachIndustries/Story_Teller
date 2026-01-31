@@ -50,6 +50,8 @@ services:
       - ollama_models:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_DEBUG=0
+      - GIN_MODE=release
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "ollama", "list"]
