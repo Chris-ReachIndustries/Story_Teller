@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# Go
+*.test
+__debug_bin
+
+# Misc
+*.bak
+*.tmp
+
+# Generated thumbnails (regenerated at runtime)
+cards/*/thumbs/
+
+# AI model cache (local volumes)
+ollama_models/
+
+# Secrets (explicit patterns)
+.env
+.env.*
+!.env.example
