@@ -109,20 +109,10 @@ type ollamaResponse struct {
 
 // Storytell implements Client.Storytell
 func (c *OllamaClient) Storytell(hand []CardWithThumb) (*StorytellerResponse, error) {
-	prompt := fmt.Sprintf(`You are playing Dixit as the storyteller.
-
-TASK: Pick ONE card (1-%d) and create a short, evocative clue (2-6 words).
-The clue should be abstract - use metaphor, emotion, or theme. Don't describe what you see literally.
-
-RESPOND WITH ONLY THIS FORMAT:
-{"selectedCard": NUMBER, "clue": "YOUR CLUE"}
-
-Example: {"selectedCard": 3, "clue": "where dreams take flight"}
-
-Pick a card and write your response now:`, len(hand))
-
+	// Build content with images FIRST, then question at the END
+	// LLaVA responds better to "look at images, then answer" format
 	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: prompt},
+		ollamaTextContent{Type: "text", Text: "Here are your cards for Dixit:"},
 	}
 
 	for i, card := range hand {
@@ -137,6 +127,15 @@ Pick a card and write your response now:`, len(hand))
 			},
 		)
 	}
+
+	// Add the question AFTER all images - LLaVA follows this better
+	question := fmt.Sprintf(`You must pick ONE card (1-%d) and give a short clue (2-5 words) that hints at it without being obvious.
+
+Answer with ONLY: Card X, clue: "your clue"
+Example: Card 2, clue: "dreams of tomorrow"
+
+Which card do you pick and what is your clue?`, len(hand))
+	content = append(content, ollamaTextContent{Type: "text", Text: question})
 
 	respBody, err := c.sendRequest(content)
 	if err != nil {
@@ -178,20 +177,9 @@ Pick a card and write your response now:`, len(hand))
 
 // Submit implements Client.Submit
 func (c *OllamaClient) Submit(hand []CardWithThumb, clue string) (*SubmitResponse, error) {
-	prompt := fmt.Sprintf(`You are playing Dixit. The clue is: "%s"
-
-TASK: Pick ONE card (1-%d) from your hand that best matches this clue.
-Think about mood, theme, and symbolism - not literal matches.
-
-RESPOND WITH ONLY THIS FORMAT:
-{"selectedCard": NUMBER}
-
-Example: {"selectedCard": 2}
-
-Pick a card now:`, clue, len(hand))
-
+	// Build content with images FIRST, then question at the END
 	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: prompt},
+		ollamaTextContent{Type: "text", Text: "Here are your cards:"},
 	}
 
 	for i, card := range hand {
@@ -206,6 +194,14 @@ Pick a card now:`, clue, len(hand))
 			},
 		)
 	}
+
+	// Add the question AFTER all images
+	question := fmt.Sprintf(`The clue is: "%s"
+
+Which card (1-%d) best matches this clue? Consider mood and theme, not literal meaning.
+
+Answer with ONLY the card number, like: Card 3`, clue, len(hand))
+	content = append(content, ollamaTextContent{Type: "text", Text: question})
 
 	respBody, err := c.sendRequest(content)
 	if err != nil {
@@ -236,26 +232,15 @@ Pick a card now:`, clue, len(hand))
 
 // Vote implements Client.Vote
 func (c *OllamaClient) Vote(submissions []CardWithThumb, clue string, ownIndex int) (*VoteResponse, error) {
-	prompt := fmt.Sprintf(`You are playing Dixit. The clue is: "%s"
-
-TASK: Vote for which card (1-%d) you think is the storyteller's original card.
-IMPORTANT: Card %d is YOUR card - you CANNOT vote for it!
-
-RESPOND WITH ONLY THIS FORMAT:
-{"selectedCard": NUMBER}
-
-Example: {"selectedCard": 1}
-
-Which card matches the clue best? (NOT card %d):`, clue, len(submissions), ownIndex, ownIndex)
-
+	// Build content with images FIRST, then question at the END
 	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: prompt},
+		ollamaTextContent{Type: "text", Text: "Here are the cards on the table:"},
 	}
 
 	for i, card := range submissions {
 		label := fmt.Sprintf("Card %d:", i+1)
 		if i+1 == ownIndex {
-			label = fmt.Sprintf("Card %d (YOUR CARD - cannot vote):", i+1)
+			label = fmt.Sprintf("Card %d (this is YOUR card):", i+1)
 		}
 		content = append(content,
 			ollamaTextContent{Type: "text", Text: label},
@@ -268,6 +253,14 @@ Which card matches the clue best? (NOT card %d):`, clue, len(submissions), ownIn
 			},
 		)
 	}
+
+	// Add the question AFTER all images
+	question := fmt.Sprintf(`The clue is: "%s"
+
+Which card (1-%d) do you think the storyteller chose? You cannot pick Card %d (your own card).
+
+Answer with ONLY the card number, like: Card 2`, clue, len(submissions), ownIndex)
+	content = append(content, ollamaTextContent{Type: "text", Text: question})
 
 	respBody, err := c.sendRequest(content)
 	if err != nil {
