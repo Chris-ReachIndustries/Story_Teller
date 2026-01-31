@@ -904,7 +904,11 @@ func (h *Hub) processSingleBotAction(room *game.Room) bool {
 
 // botStorytell has a bot submit a storyteller clue
 func (h *Hub) botStorytell(room *game.Room, bot *game.Player) bool {
-	hand, err := h.getHandWithThumbs(bot)
+	cardSetID := room.Config.DeckSetID
+	if cardSetID == "" {
+		cardSetID = "default"
+	}
+	hand, err := h.getHandWithThumbs(bot, cardSetID)
 	if err != nil {
 		return h.botStorytellFallback(room, bot)
 	}
@@ -941,7 +945,11 @@ func (h *Hub) botStorytellFallback(room *game.Room, bot *game.Player) bool {
 
 // botSubmitCard has a bot submit a card for the clue
 func (h *Hub) botSubmitCard(room *game.Room, bot *game.Player) bool {
-	hand, err := h.getHandWithThumbs(bot)
+	cardSetID := room.Config.DeckSetID
+	if cardSetID == "" {
+		cardSetID = "default"
+	}
+	hand, err := h.getHandWithThumbs(bot, cardSetID)
 	if err != nil {
 		return h.botSubmitFallback(room, bot)
 	}
@@ -975,6 +983,11 @@ func (h *Hub) botSubmitFallback(room *game.Room, bot *game.Player) bool {
 
 // botVote has a bot vote for a card
 func (h *Hub) botVote(room *game.Room, bot *game.Player) bool {
+	cardSetID := room.Config.DeckSetID
+	if cardSetID == "" {
+		cardSetID = "default"
+	}
+
 	// Find bot's own submission index (can't vote for self)
 	ownIndex := -1
 	for i, sub := range room.State.Submissions {
@@ -984,7 +997,7 @@ func (h *Hub) botVote(room *game.Room, bot *game.Player) bool {
 		}
 	}
 
-	thumbs, err := h.getSubmissionThumbs(room.State.Submissions)
+	thumbs, err := h.getSubmissionThumbs(room.State.Submissions, cardSetID)
 	if err != nil {
 		return h.botVoteFallback(room, bot, ownIndex)
 	}
@@ -1042,10 +1055,10 @@ func (h *Hub) checkAndCalculateScores(room *game.Room) {
 }
 
 // getHandWithThumbs converts a player's hand to cards with thumbnails
-func (h *Hub) getHandWithThumbs(player *game.Player) ([]ai.CardWithThumb, error) {
+func (h *Hub) getHandWithThumbs(player *game.Player, cardSetID string) ([]ai.CardWithThumb, error) {
 	result := make([]ai.CardWithThumb, len(player.Hand))
 	for i, card := range player.Hand {
-		dataURL, err := h.thumbService.GetCardThumbDataURL(card.ID)
+		dataURL, err := h.thumbService.GetCardThumbDataURL(card.ID, cardSetID)
 		if err != nil {
 			return nil, err
 		}
@@ -1058,10 +1071,10 @@ func (h *Hub) getHandWithThumbs(player *game.Player) ([]ai.CardWithThumb, error)
 }
 
 // getSubmissionThumbs converts submissions to cards with thumbnails
-func (h *Hub) getSubmissionThumbs(submissions []game.Submission) ([]ai.CardWithThumb, error) {
+func (h *Hub) getSubmissionThumbs(submissions []game.Submission, cardSetID string) ([]ai.CardWithThumb, error) {
 	result := make([]ai.CardWithThumb, len(submissions))
 	for i, sub := range submissions {
-		dataURL, err := h.thumbService.GetCardThumbDataURL(sub.Card.ID)
+		dataURL, err := h.thumbService.GetCardThumbDataURL(sub.Card.ID, cardSetID)
 		if err != nil {
 			return nil, err
 		}

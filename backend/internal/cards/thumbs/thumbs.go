@@ -17,43 +17,47 @@ import (
 
 // Service converts card images (PNG or SVG) to base64 PNG data URLs for OpenAI Vision API
 type Service struct {
-	cardsPath string
-	width     int
-	cache     map[string]string // cardID → data:image/png;base64,...
-	mu        sync.RWMutex
+	basePath string // Base cards path (e.g., /app/cards)
+	width    int
+	cache    map[string]string // "setID/cardID" → data:image/png;base64,...
+	mu       sync.RWMutex
 }
 
 // NewService creates a new thumbnail service
-func NewService(cardsPath string, width int) *Service {
+// basePath should be the base cards directory (e.g., /app/cards)
+func NewService(basePath string, width int) *Service {
 	if width <= 0 {
 		width = 320 // Default width
 	}
 	return &Service{
-		cardsPath: cardsPath,
-		width:     width,
-		cache:     make(map[string]string),
+		basePath: basePath,
+		width:    width,
+		cache:    make(map[string]string),
 	}
 }
 
-// GetCardThumbDataURL returns a base64 data URL for the card image
-func (s *Service) GetCardThumbDataURL(cardID string) (string, error) {
+// GetCardThumbDataURL returns a base64 data URL for a card image from a specific card set
+func (s *Service) GetCardThumbDataURL(cardID string, cardSetID string) (string, error) {
+	// Build cache key
+	cacheKey := cardSetID + "/" + cardID
+
 	// Check cache first
 	s.mu.RLock()
-	if dataURL, ok := s.cache[cardID]; ok {
+	if dataURL, ok := s.cache[cacheKey]; ok {
 		s.mu.RUnlock()
 		return dataURL, nil
 	}
 	s.mu.RUnlock()
 
 	// Generate thumbnail
-	dataURL, err := s.generateThumb(cardID)
+	dataURL, err := s.generateThumb(cardID, cardSetID)
 	if err != nil {
 		return "", err
 	}
 
 	// Cache the result
 	s.mu.Lock()
-	s.cache[cardID] = dataURL
+	s.cache[cacheKey] = dataURL
 	s.mu.Unlock()
 
 	return dataURL, nil
@@ -61,10 +65,11 @@ func (s *Service) GetCardThumbDataURL(cardID string) (string, error) {
 
 // generateThumb renders an image to PNG thumbnail and returns base64 data URL
 // Supports both SVG and PNG source images
-func (s *Service) generateThumb(cardID string) (string, error) {
-	// Try PNG first (generated cards), then SVG (manual cards)
-	pngPath := filepath.Join(s.cardsPath, "images", cardID+".png")
-	svgPath := filepath.Join(s.cardsPath, "images", cardID+".svg")
+func (s *Service) generateThumb(cardID string, cardSetID string) (string, error) {
+	// Build path: basePath/cardSetID/images/cardID.png
+	setPath := filepath.Join(s.basePath, cardSetID)
+	pngPath := filepath.Join(setPath, "images", cardID+".png")
+	svgPath := filepath.Join(setPath, "images", cardID+".svg")
 
 	if _, err := os.Stat(pngPath); err == nil {
 		return s.generateThumbFromPNG(pngPath)
@@ -74,7 +79,7 @@ func (s *Service) generateThumb(cardID string) (string, error) {
 		return s.generateThumbFromSVG(svgPath)
 	}
 
-	return "", fmt.Errorf("card image not found: %s (looked in %s) - if using fantasy cards, ensure Git LFS is installed and run 'git lfs pull'", cardID, filepath.Dir(pngPath))
+	return "", fmt.Errorf("card image not found: %s in set '%s' (looked in %s) - if using fantasy cards, ensure Git LFS is installed and run 'git lfs pull'", cardID, cardSetID, filepath.Dir(pngPath))
 }
 
 // generateThumbFromPNG creates a thumbnail from a PNG file
@@ -154,12 +159,12 @@ func (s *Service) generateThumbFromSVG(svgPath string) (string, error) {
 	return dataURL, nil
 }
 
-// PrewarmCache loads thumbnails for given card IDs into cache
-func (s *Service) PrewarmCache(cardIDs []string) error {
+// PrewarmCache loads thumbnails for given card IDs into cache for a specific card set
+func (s *Service) PrewarmCache(cardIDs []string, cardSetID string) error {
 	for _, cardID := range cardIDs {
-		if _, err := s.GetCardThumbDataURL(cardID); err != nil {
+		if _, err := s.GetCardThumbDataURL(cardID, cardSetID); err != nil {
 			// Log but don't fail - some cards might not have images
-			fmt.Printf("Warning: failed to prewarm cache for %s: %v\n", cardID, err)
+			fmt.Printf("Warning: failed to prewarm cache for %s in set %s: %v\n", cardID, cardSetID, err)
 		}
 	}
 	return nil

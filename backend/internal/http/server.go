@@ -56,9 +56,8 @@ func NewServer(cardsBasePath, cardSetName string) *Server {
 	cardSetPath := filepath.Join(cardsBasePath, cardSetName)
 	cardLoader := cards.NewLoader(filepath.Join(cardSetPath, "cards.json"))
 
-	// Initialize AI services with the default set path
-	// Note: AI bots currently use the default set for thumbnails
-	aiClient, thumbService := initAIServices(cardSetPath, cardLoader)
+	// Initialize AI services with base path (supports multiple card sets)
+	aiClient, thumbService := initAIServices(cardsBasePath, cardSetName, cardLoader)
 
 	// Pass registry to hub for per-room deck loading
 	hub := ws.NewHub(roomManager, cardRegistry, cardsBasePath, aiClient, thumbService)
@@ -91,7 +90,7 @@ func NewServer(cardsBasePath, cardSetName string) *Server {
 }
 
 // initAIServices initializes AI client and thumbnail service from environment
-func initAIServices(cardsPath string, cardLoader *cards.Loader) (ai.Client, *thumbs.Service) {
+func initAIServices(cardsBasePath string, defaultSetName string, cardLoader *cards.Loader) (ai.Client, *thumbs.Service) {
 	aiEnabled := os.Getenv("AI_ENABLED") == "true"
 	if !aiEnabled {
 		log.Println("AI bots disabled (AI_ENABLED != true)")
@@ -126,10 +125,10 @@ func initAIServices(cardsPath string, cardLoader *cards.Loader) (ai.Client, *thu
 		}
 	}
 
-	// Create thumbnail service (shared by all providers)
-	thumbService := thumbs.NewService(cardsPath, thumbWidth)
+	// Create thumbnail service with base path (supports all card sets)
+	thumbService := thumbs.NewService(cardsBasePath, thumbWidth)
 
-	// Prewarm thumbnail cache
+	// Prewarm thumbnail cache for the default card set
 	go func() {
 		cards, err := cardLoader.GetCards()
 		if err != nil {
@@ -140,10 +139,10 @@ func initAIServices(cardsPath string, cardLoader *cards.Loader) (ai.Client, *thu
 		for i, c := range cards {
 			cardIDs[i] = c.ID
 		}
-		if err := thumbService.PrewarmCache(cardIDs); err != nil {
+		if err := thumbService.PrewarmCache(cardIDs, defaultSetName); err != nil {
 			log.Printf("Warning: thumbnail prewarm failed: %v", err)
 		} else {
-			log.Printf("Thumbnail cache prewarmed with %d cards", len(cardIDs))
+			log.Printf("Thumbnail cache prewarmed with %d cards from set '%s'", len(cardIDs), defaultSetName)
 		}
 	}()
 
