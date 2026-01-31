@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"dixit-backend/internal/ai"
@@ -14,8 +13,6 @@ import (
 	"dixit-backend/internal/cards/thumbs"
 	"dixit-backend/internal/game"
 )
-
-var broadcastCounter uint64
 
 // Hub maintains the set of active clients and broadcasts messages
 type Hub struct {
@@ -684,8 +681,6 @@ func (h *Hub) handleAddBot(client *Client) {
 
 // broadcastRoomState sends the current state to all clients in a room
 func (h *Hub) broadcastRoomState(roomCode string) {
-	broadcastID := atomic.AddUint64(&broadcastCounter, 1)
-
 	room := h.roomManager.GetRoom(roomCode)
 	if room == nil {
 		return
