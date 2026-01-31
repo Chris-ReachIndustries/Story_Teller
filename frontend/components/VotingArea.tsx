@@ -73,6 +73,15 @@ export default function VotingArea({
     return voters
   }
 
+  // Get initials from a name (first letter of first and last word)
+  const getInitials = (name: string): string => {
+    const words = name.trim().split(/\s+/)
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase()
+    }
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase()
+  }
+
   const isShowingResults = revealedStorytellerIndex !== undefined
 
   return (
@@ -111,26 +120,41 @@ export default function VotingArea({
                   }
                   size="large"
                 />
-                {/* Vote indicators shown during results */}
+                {/* Vote indicators shown during results - overlapping avatar circles */}
                 {isShowingResults && voters.length > 0 && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
-                    {voters.map((name, i) => (
-                      <div
-                        key={i}
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium shadow-lg ${
-                          submission.index === roundResults?.storytellerCard
-                            ? 'bg-green-500 text-white'
-                            : 'bg-slate-600 text-gray-200'
-                        }`}
-                        title={name}
-                      >
-                        {name.length > 8 ? name.substring(0, 8) + '…' : name}
-                      </div>
-                    ))}
+                  <div
+                    className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center"
+                    title={voters.join(', ')}
+                  >
+                    <div className="flex -space-x-2">
+                      {voters.slice(0, 4).map((name, i) => (
+                        <div
+                          key={i}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 border-slate-800 shadow-md ${
+                            submission.index === roundResults?.storytellerCard
+                              ? 'bg-green-500 text-white'
+                              : 'bg-slate-500 text-gray-100'
+                          }`}
+                          style={{ zIndex: voters.length - i }}
+                        >
+                          {getInitials(name)}
+                        </div>
+                      ))}
+                      {voters.length > 4 && (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 border-slate-800 bg-slate-600 text-gray-200 shadow-md"
+                          style={{ zIndex: 0 }}
+                        >
+                          +{voters.length - 4}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
-              <span className="text-gray-400 text-sm mt-2">Card #{submission.index + 1}</span>
+              <span className={`text-gray-400 text-sm ${isShowingResults && voters.length > 0 ? 'mt-4' : 'mt-2'}`}>
+                Card #{submission.index + 1}
+              </span>
             </div>
           )
         })}
