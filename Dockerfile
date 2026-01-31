@@ -33,8 +33,8 @@ RUN npm run build
 # Stage 3: Production runtime
 FROM alpine:3.19
 
-# Install Node.js and supervisord
-RUN apk add --no-cache nodejs npm supervisor
+# Install Node.js, supervisord, and curl (for health checks)
+RUN apk add --no-cache nodejs npm supervisor curl
 
 # Create app directory
 WORKDIR /app
@@ -50,8 +50,11 @@ COPY --from=frontend-builder /build/public /app/frontend/.next/standalone/public
 # Copy cards directory
 COPY cards/ /app/cards/
 
-# Copy supervisord config
+# Copy supervisord config and startup script
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/startup.sh /app/startup.sh
+# Convert Windows line endings to Unix and make executable
+RUN sed -i 's/\r$//' /app/startup.sh && chmod +x /app/startup.sh
 
 # Create log directory
 RUN mkdir -p /var/log
@@ -65,5 +68,5 @@ ENV CARDS_PATH=/app/cards
 ENV NEXTJS_URL=http://localhost:3000
 ENV MIN_PLAYERS=4
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Start via startup script (waits for Ollama model if using local AI)
+CMD ["/app/startup.sh"]

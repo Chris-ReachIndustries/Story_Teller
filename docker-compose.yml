@@ -52,10 +52,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 30s
     deploy:
       resources:
         reservations:
@@ -63,6 +63,42 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    networks:
+      - dixit-network
+    profiles:
+      - local-ai
+
+  # Model initialization service - pulls the model on first run
+  ollama-init:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=ollama
+      - OLLAMA_MODEL=${AI_MODEL:-llava:7b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Ollama server..."
+        until curl -s http://ollama:11434/api/tags > /dev/null 2>&1; do
+          sleep 2
+        done
+        echo "Ollama server ready"
+
+        MODEL=$${OLLAMA_MODEL}
+        echo "Checking for model: $$MODEL"
+
+        if curl -s http://ollama:11434/api/tags | grep -q "\"name\":\"$$MODEL\""; then
+          echo "Model $$MODEL already exists, skipping download"
+        else
+          echo "Pulling model $$MODEL (this may take several minutes)..."
+          curl -X POST http://ollama:11434/api/pull -d "{\"name\": \"$$MODEL\"}" --no-buffer
+          echo ""
+          echo "Model $$MODEL downloaded successfully"
+        fi
+    depends_on:
+      ollama:
+        condition: service_healthy
     networks:
       - dixit-network
     profiles:

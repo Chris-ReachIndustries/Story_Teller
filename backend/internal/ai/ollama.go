@@ -109,33 +109,17 @@ type ollamaResponse struct {
 
 // Storytell implements Client.Storytell
 func (c *OllamaClient) Storytell(hand []CardWithThumb) (*StorytellerResponse, error) {
-	prompt := `You are playing Dixit. You are the storyteller this round.
+	prompt := fmt.Sprintf(`You are playing Dixit as the storyteller.
 
-Objective:
-Create a clue that makes SOME (not all, not none) players guess your card.
-You are trying to engineer an interesting split vote (ideally 1–(players-2) correct guesses).
+TASK: Pick ONE card (1-%d) and create a short, evocative clue (2-6 words).
+The clue should be abstract - use metaphor, emotion, or theme. Don't describe what you see literally.
 
-Clue rules:
-- Do NOT literally describe the image or list visible objects ("a cat", "a tower", "a moon", etc.).
-- Do NOT mention colors, composition, or camera framing ("top-left", "close up").
-- Avoid unique proper nouns that directly identify the card. Indirect references are okay (myth, proverb, classic story vibe).
-- Prefer: metaphor, emotion, theme, relationship, contradiction, atmosphere, or a vague cultural echo.
-- Clue length: 2–10 words. No emojis. No quotes.
+RESPOND WITH ONLY THIS FORMAT:
+{"selectedCard": NUMBER, "clue": "YOUR CLUE"}
 
-Strategy:
-- If your card feels very distinctive, choose a clue that could plausibly match 1–2 other cards.
-- If your hand is uniformly similar, choose a clue that distinguishes your chosen card subtly.
+Example: {"selectedCard": 3, "clue": "where dreams take flight"}
 
-Task:
-1) Choose exactly ONE card from your hand.
-2) Provide exactly ONE clue.
-
-Return ONLY valid JSON (no markdown, no extra keys):
-{"selectedCard": <1-N>, "clue": "<text>"}
-
-Self-check before responding:
-- selectedCard is a valid number 1..N
-- clue obeys the rules above`
+Pick a card and write your response now:`, len(hand))
 
 	content := []interface{}{
 		ollamaTextContent{Type: "text", Text: prompt},
@@ -164,7 +148,21 @@ Self-check before responding:
 
 	var response StorytellerResponse
 	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		// Try fallback parsing for non-JSON responses
+		cardNum := extractCardNumber(respBody, len(hand))
+		clue := extractClue(respBody)
+
+		if cardNum > 0 {
+			response.SelectedCard = cardNum
+			if clue != "" {
+				response.Clue = clue
+			} else {
+				// Generate a generic clue if model didn't provide one
+				response.Clue = "mysterious journey"
+			}
+		} else {
+			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		}
 	}
 
 	// Validate response
@@ -172,7 +170,7 @@ Self-check before responding:
 		return nil, fmt.Errorf("invalid card selection: %d (must be 1-%d)", response.SelectedCard, len(hand))
 	}
 	if response.Clue == "" {
-		return nil, fmt.Errorf("empty clue in response")
+		response.Clue = "hidden meaning"
 	}
 
 	return &response, nil
@@ -180,27 +178,17 @@ Self-check before responding:
 
 // Submit implements Client.Submit
 func (c *OllamaClient) Submit(hand []CardWithThumb, clue string) (*SubmitResponse, error) {
-	prompt := fmt.Sprintf(`You are playing Dixit. You are NOT the storyteller.
+	prompt := fmt.Sprintf(`You are playing Dixit. The clue is: "%s"
 
-The storyteller's clue is: "%s"
+TASK: Pick ONE card (1-%d) from your hand that best matches this clue.
+Think about mood, theme, and symbolism - not literal matches.
 
-Objective:
-Submit ONE card from your hand that will attract votes by seeming like it could be the storyteller's card.
+RESPOND WITH ONLY THIS FORMAT:
+{"selectedCard": NUMBER}
 
-Important:
-- You are trying to be a believable decoy, not the "best match" in a literal sense.
-- Think: mood, symbolism, implied story, emotional tone, genre.
+Example: {"selectedCard": 2}
 
-Strategy:
-- If the clue is abstract: pick a card with strong atmosphere or symbolism.
-- If the clue hints at a narrative: pick a card that suggests a similar story arc.
-- Avoid being too perfect (obvious storyteller) or too random (no votes).
-
-Return ONLY valid JSON (no markdown, no extra keys):
-{"selectedCard": <1-N>}
-
-Self-check:
-- selectedCard is 1..N`, clue)
+Pick a card now:`, clue, len(hand))
 
 	content := []interface{}{
 		ollamaTextContent{Type: "text", Text: prompt},
@@ -229,7 +217,13 @@ Self-check:
 
 	var response SubmitResponse
 	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		// Try fallback parsing for non-JSON responses
+		cardNum := extractCardNumber(respBody, len(hand))
+		if cardNum > 0 {
+			response.SelectedCard = cardNum
+		} else {
+			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		}
 	}
 
 	// Validate response
@@ -242,25 +236,17 @@ Self-check:
 
 // Vote implements Client.Vote
 func (c *OllamaClient) Vote(submissions []CardWithThumb, clue string, ownIndex int) (*VoteResponse, error) {
-	prompt := fmt.Sprintf(`You are playing Dixit. You are voting for which card is the STORYTELLER'S.
+	prompt := fmt.Sprintf(`You are playing Dixit. The clue is: "%s"
 
-The storyteller's clue is: "%s"
+TASK: Vote for which card (1-%d) you think is the storyteller's original card.
+IMPORTANT: Card %d is YOUR card - you CANNOT vote for it!
 
-Look at all the submitted cards and vote for the one you think is the STORYTELLER'S card (not your own).
+RESPOND WITH ONLY THIS FORMAT:
+{"selectedCard": NUMBER}
 
-IMPORTANT: Card %d is YOUR card - you cannot vote for it! Choose a different card.
+Example: {"selectedCard": 1}
 
-How to decide:
-- Interpret the clue as the storyteller intended: metaphor, mood, theme, indirect reference.
-- Prefer the card that feels like it inspired the clue rather than one that merely "fits".
-- If multiple cards fit, choose the one with the most storyteller-like intent (creative, central, evocative).
-
-Return ONLY valid JSON (no markdown, no extra keys):
-{"selectedCard": <1-N>}
-
-Self-check:
-- selectedCard is 1..N and not %d (your own card)
-Remember: You CANNOT vote for card %d (your own card).`, clue, ownIndex, ownIndex, ownIndex)
+Which card matches the clue best? (NOT card %d):`, clue, len(submissions), ownIndex, ownIndex)
 
 	content := []interface{}{
 		ollamaTextContent{Type: "text", Text: prompt},
@@ -293,7 +279,22 @@ Remember: You CANNOT vote for card %d (your own card).`, clue, ownIndex, ownInde
 
 	var response VoteResponse
 	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		// Try fallback parsing for non-JSON responses
+		cardNum := extractCardNumber(respBody, len(submissions))
+		if cardNum > 0 && cardNum != ownIndex {
+			response.SelectedCard = cardNum
+		} else if cardNum == ownIndex {
+			// Model picked its own card, try to find another number
+			// Default to first valid card that isn't own
+			for i := 1; i <= len(submissions); i++ {
+				if i != ownIndex {
+					response.SelectedCard = i
+					break
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+		}
 	}
 
 	// Validate response
@@ -376,4 +377,111 @@ func cleanOllamaJSONResponse(s string) string {
 	s = strings.TrimSpace(s)
 
 	return s
+}
+
+// extractCardNumber attempts to extract a card number from free-form AI response
+// when the model doesn't return proper JSON. Returns 0 if no card found.
+func extractCardNumber(text string, maxCard int) int {
+	text = strings.ToLower(text)
+
+	// Pattern 1: "card X" or "Card X" (most common)
+	cardPattern := regexp.MustCompile(`card\s*[#:]?\s*(\d+)`)
+	if matches := cardPattern.FindStringSubmatch(text); len(matches) > 1 {
+		if num := parseCardNum(matches[1], maxCard); num > 0 {
+			return num
+		}
+	}
+
+	// Pattern 2: "selectedCard": X or selectedcard: X (JSON-ish)
+	selectedPattern := regexp.MustCompile(`["']?selectedcard["']?\s*[":]\s*(\d+)`)
+	if matches := selectedPattern.FindStringSubmatch(text); len(matches) > 1 {
+		if num := parseCardNum(matches[1], maxCard); num > 0 {
+			return num
+		}
+	}
+
+	// Pattern 3: "choose X" or "select X" or "pick X"
+	choosePattern := regexp.MustCompile(`(?:choose|select|pick|vote\s+for)\s+(?:card\s+)?#?(\d+)`)
+	if matches := choosePattern.FindStringSubmatch(text); len(matches) > 1 {
+		if num := parseCardNum(matches[1], maxCard); num > 0 {
+			return num
+		}
+	}
+
+	// Pattern 4: "option X" or "#X"
+	optionPattern := regexp.MustCompile(`(?:option|#)\s*(\d+)`)
+	if matches := optionPattern.FindStringSubmatch(text); len(matches) > 1 {
+		if num := parseCardNum(matches[1], maxCard); num > 0 {
+			return num
+		}
+	}
+
+	// Pattern 5: Written numbers (first, second, etc.)
+	ordinals := map[string]int{
+		"first": 1, "second": 2, "third": 3, "fourth": 4,
+		"fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8,
+	}
+	for word, num := range ordinals {
+		if strings.Contains(text, word) && num <= maxCard {
+			return num
+		}
+	}
+
+	// Pattern 6: Just find any single digit that could be a card number
+	// Only if response is short (likely a simple answer)
+	if len(text) < 200 {
+		digitPattern := regexp.MustCompile(`\b(\d)\b`)
+		if matches := digitPattern.FindStringSubmatch(text); len(matches) > 1 {
+			if num := parseCardNum(matches[1], maxCard); num > 0 {
+				return num
+			}
+		}
+	}
+
+	return 0
+}
+
+// parseCardNum safely parses a string to int and validates range
+func parseCardNum(s string, maxCard int) int {
+	var num int
+	if _, err := fmt.Sscanf(s, "%d", &num); err == nil {
+		if num >= 1 && num <= maxCard {
+			return num
+		}
+	}
+	return 0
+}
+
+// extractClue attempts to extract a clue from free-form AI response
+func extractClue(text string) string {
+	// Pattern 1: "clue": "X" (JSON-ish)
+	cluePattern := regexp.MustCompile(`["']?clue["']?\s*[":]\s*["']([^"']+)["']`)
+	if matches := cluePattern.FindStringSubmatch(text); len(matches) > 1 {
+		return strings.TrimSpace(matches[1])
+	}
+
+	// Pattern 2: After "clue:" or "clue is"
+	colonPattern := regexp.MustCompile(`(?i)clue(?:\s+is)?[:\s]+["']?([^"'\n]+)["']?`)
+	if matches := colonPattern.FindStringSubmatch(text); len(matches) > 1 {
+		clue := strings.TrimSpace(matches[1])
+		// Clean up any trailing punctuation
+		clue = strings.TrimRight(clue, ".,!?")
+		if len(clue) > 2 && len(clue) < 100 {
+			return clue
+		}
+	}
+
+	// Pattern 3: Quoted text that looks like a clue (2-10 words)
+	quotePattern := regexp.MustCompile(`["']([^"']{5,50})["']`)
+	if matches := quotePattern.FindAllStringSubmatch(text, -1); len(matches) > 0 {
+		for _, m := range matches {
+			clue := strings.TrimSpace(m[1])
+			words := strings.Fields(clue)
+			if len(words) >= 2 && len(words) <= 10 {
+				return clue
+			}
+		}
+	}
+
+	return ""
 }
