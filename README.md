@@ -173,7 +173,13 @@ For cost-effective testing, use `AI_MODEL=gpt-4o-mini`.
 
 ### Local AI Mode (Offline)
 
-Run AI bots entirely locally using Ollama with vision models. No OpenAI API key required.
+Run AI bots entirely locally using Ollama. No OpenAI API key required.
+
+The local AI uses a **two-stage pipeline** for better decision-making:
+1. **Vision model** (LLaVA): Describes card images in natural language
+2. **Text model** (llama3.2): Makes game decisions based on those descriptions
+
+This approach plays to each model's strengths - LLaVA excels at image understanding, while llama3.2 follows game instructions reliably.
 
 ```bash
 # Linux/Mac
@@ -185,7 +191,7 @@ $env:AI_PROVIDER="local"
 docker compose --profile local-ai up --build
 ```
 
-**First run will download the model (~4.5GB for llava:7b), which takes several minutes.**
+**First run downloads two models (~6.5GB total: ~4.5GB for llava:7b + ~2GB for llama3.2:3b).**
 
 **Local AI Configuration:**
 
@@ -193,10 +199,11 @@ docker compose --profile local-ai up --build
 |----------|---------|-------------|
 | `AI_PROVIDER` | openai | Set to `local` for Ollama |
 | `LOCAL_AI_URL` | http://ollama:11434 | Ollama endpoint |
-| `AI_MODEL` | llava:7b | Vision model to use |
-| `AI_TIMEOUT_MS` | 60000 | Request timeout (longer for local) |
+| `AI_MODEL` | llava:7b | Vision model for image description |
+| `AI_TEXT_MODEL` | llama3.2:3b | Text model for game decisions |
+| `AI_TIMEOUT_MS` | 180000 | Request timeout (3 min for local inference) |
 
-**Available Local Models:**
+**Available Vision Models:**
 
 | Model | Size | Quality | Speed |
 |-------|------|---------|-------|
@@ -204,9 +211,17 @@ docker compose --profile local-ai up --build
 | `llava:13b` | 8GB | Better | Medium |
 | `llama3.2-vision:11b` | 7GB | Best | Medium |
 
-To use a different model:
+**Available Text Models:**
+
+| Model | Size | Quality | Speed |
+|-------|------|---------|-------|
+| `llama3.2:3b` | 2GB | Good | Fastest |
+| `llama3.2:8b` | 4.7GB | Better | Medium |
+| `mistral:7b` | 4GB | Good | Medium |
+
+To use different models:
 ```bash
-AI_ENABLED=true AI_PROVIDER=local AI_MODEL=llama3.2-vision:11b docker compose --profile local-ai up --build
+AI_ENABLED=true AI_PROVIDER=local AI_MODEL=llava:13b AI_TEXT_MODEL=llama3.2:8b docker compose --profile local-ai up --build
 ```
 
 **System Requirements for Local AI:**
@@ -455,7 +470,8 @@ dixit/
 │       ├── cards.json      # Card definitions
 │       └── images/         # Card images (PNG/SVG)
 ├── docker/
-│   └── supervisord.conf    # Process manager config
+│   ├── supervisord.conf    # Process manager config
+│   └── startup.sh          # Container startup script (waits for AI models)
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
@@ -473,8 +489,11 @@ Environment variables:
 | `NEXTJS_URL` | http://localhost:3000 | Next.js URL for proxy |
 | `MIN_PLAYERS` | 4 | Minimum players to start (3-6) |
 | `AI_ENABLED` | false | Enable AI bot support and card generation |
-| `OPENAI_API_KEY` | - | OpenAI API key |
-| `AI_MODEL` | gpt-4o | OpenAI model for bots |
+| `AI_PROVIDER` | openai | AI provider (openai or local) |
+| `OPENAI_API_KEY` | - | OpenAI API key (for openai provider) |
+| `AI_MODEL` | gpt-4o / llava:7b | Vision model (OpenAI or Ollama) |
+| `AI_TEXT_MODEL` | llama3.2:3b | Text model for decisions (local AI only) |
+| `AI_TIMEOUT_MS` | 12000 / 180000 | Request timeout (OpenAI / local) |
 | `CARDS_REGENERATE` | false | Force regenerate card deck |
 | `DALLE_MODEL` | dall-e-3 | DALL-E model for cards |
 | `DALLE_QUALITY` | standard | Image quality (standard/hd) |
