@@ -1,0 +1,77 @@
+services:
+  dixit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - CARDS_PATH=/app/cards
+      - NEXTJS_URL=http://localhost:3000
+      - MIN_PLAYERS=${MIN_PLAYERS:-4}
+      # AI Bot configuration
+      - AI_ENABLED=${AI_ENABLED:-false}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LOCAL_AI_URL=${LOCAL_AI_URL:-http://ollama:11434}
+      - AI_MODEL=${AI_MODEL:-}
+      - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-}
+      - AI_MAX_TOKENS=${AI_MAX_TOKENS:-250}
+      - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
+      - AI_THUMB_WIDTH=${AI_THUMB_WIDTH:-320}
+      # Card generation configuration
+      - CARD_SET_NAME=${CARD_SET_NAME:-default}
+      - CARDS_REGENERATE=${CARDS_REGENERATE:-false}
+      - DALLE_MODEL=${DALLE_MODEL:-dall-e-3}
+      - DALLE_SIZE=${DALLE_SIZE:-1024x1792}
+      - DALLE_QUALITY=${DALLE_QUALITY:-standard}
+      - DALLE_CONCURRENCY=${DALLE_CONCURRENCY:-3}
+    volumes:
+      # Mount cards directory (read-write for card generation)
+      - ./cards:/app/cards
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # Increased for card generation time
+    networks:
+      - dixit-network
+
+  # Local LLM service using Ollama (only starts with --profile local-ai)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - dixit-network
+    profiles:
+      - local-ai
+
+networks:
+  dixit-network:
+    driver: bridge
+
+volumes:
+  ollama_models:
+    name: dixit_ollama_models
