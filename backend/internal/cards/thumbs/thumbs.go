@@ -74,7 +74,7 @@ func (s *Service) generateThumb(cardID string) (string, error) {
 		return s.generateThumbFromSVG(svgPath)
 	}
 
-	return "", fmt.Errorf("card image not found: %s", cardID)
+	return "", fmt.Errorf("card image not found: %s (looked in %s) - if using fantasy cards, ensure Git LFS is installed and run 'git lfs pull'", cardID, filepath.Dir(pngPath))
 }
 
 // generateThumbFromPNG creates a thumbnail from a PNG file

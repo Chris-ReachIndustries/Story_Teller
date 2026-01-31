@@ -4,13 +4,24 @@ A multiplayer online Dixit-style game with real-time gameplay via WebSockets.
 
 ## Quick Start
 
+**Important:** This repo uses Git LFS for large image files. Install Git LFS before cloning:
+
 ```bash
+# Install Git LFS (one-time setup)
+git lfs install
+
+# Clone the repository
+git clone https://github.com/Chris-ReachIndustries/Story_Teller.git
+cd Story_Teller
+
 # Build and run with Docker Compose
 docker compose up --build
 
 # Open in browser
 # http://localhost:8080
 ```
+
+If you already cloned without LFS, run `git lfs pull` to download the images.
 
 For testing with 3 players (instead of 4):
 ```bash
