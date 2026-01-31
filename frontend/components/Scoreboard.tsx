@@ -53,23 +53,13 @@ export default function Scoreboard({
 
       {roundResults && (
         <div className="mt-6 pt-4 border-t border-slate-700">
-          <h4 className="text-lg font-semibold mb-3 text-gray-300">Round Details</h4>
-          <div className="text-sm text-gray-400">
-            <p>Storyteller&apos;s card was #{roundResults.storytellerCard + 1}</p>
-            <div className="mt-2">
-              <p className="font-semibold text-gray-300">Votes:</p>
-              {Object.entries(roundResults.votes).map(([playerId, votedIndex]) => {
-                const player = players.find((p) => p.id === playerId)
-                return (
-                  <p key={playerId} className="ml-2">
-                    {player?.name || 'Unknown'} voted for Card #{(votedIndex as number) + 1}
-                    {votedIndex === roundResults.storytellerCard && (
-                      <span className="text-green-400 ml-2">✓ Correct!</span>
-                    )}
-                  </p>
-                )
-              })}
-            </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">
+              Storyteller&apos;s card was <span className="text-white font-medium">#{roundResults.storytellerCard + 1}</span>
+            </span>
+            <span className="text-gray-500">
+              {Object.values(roundResults.votes).filter(v => v === roundResults.storytellerCard).length} / {Object.keys(roundResults.votes).length} correct
+            </span>
           </div>
         </div>
       )}

@@ -185,6 +185,8 @@ export default function GameBoard() {
                 submissions={submissions}
                 disabled={true}
                 revealedStorytellerIndex={roundResults.storytellerCard}
+                roundResults={roundResults}
+                players={players}
               />
             )}
             <Scoreboard players={players} roundResults={roundResults} />
