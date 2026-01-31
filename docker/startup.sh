@@ -1,12 +1,15 @@
 #!/bin/sh
 # Note: Not using set -e because we handle errors explicitly in the wait loops
 
-# If using local AI provider, wait for the model to be available
+# If using local AI provider, wait for both models to be available
 if [ "$AI_PROVIDER" = "local" ] && [ "$AI_ENABLED" = "true" ]; then
-    MODEL="${AI_MODEL:-llava:7b}"
+    VISION_MODEL="${AI_MODEL:-llava:7b}"
+    TEXT_MODEL="${AI_TEXT_MODEL:-llama3.2:3b}"
     OLLAMA_URL="${LOCAL_AI_URL:-http://ollama:11434}"
 
-    echo "Waiting for Ollama model '$MODEL' to be ready..."
+    echo "Waiting for Ollama models to be ready..."
+    echo "  Vision model: $VISION_MODEL"
+    echo "  Text model: $TEXT_MODEL"
 
     # Wait for Ollama server (up to 2 minutes)
     SERVER_WAIT=0
@@ -20,24 +23,49 @@ if [ "$AI_PROVIDER" = "local" ] && [ "$AI_ENABLED" = "true" ]; then
         SERVER_WAIT=$((SERVER_WAIT + 5))
     done
 
-    # Wait for model to be downloaded (up to 10 minutes)
+    # Wait for vision model (up to 10 minutes)
     MAX_WAIT=600
     WAITED=0
-    MODEL_READY=false
+    VISION_READY=false
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$MODEL\""; then
-            MODEL_READY=true
+        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$VISION_MODEL\""; then
+            VISION_READY=true
             break
         fi
-        echo "  Model '$MODEL' not yet available, waiting... (${WAITED}s)"
+        echo "  Vision model '$VISION_MODEL' not yet available, waiting... (${WAITED}s)"
         sleep 10
         WAITED=$((WAITED + 10))
     done
 
-    if [ "$MODEL_READY" = "true" ]; then
-        echo "Model '$MODEL' is ready!"
+    if [ "$VISION_READY" = "true" ]; then
+        echo "Vision model '$VISION_MODEL' is ready!"
     else
-        echo "WARNING: Model '$MODEL' not available after ${MAX_WAIT}s, starting anyway (will use fallback)"
+        echo "WARNING: Vision model '$VISION_MODEL' not available after ${MAX_WAIT}s"
+    fi
+
+    # Wait for text model (up to 10 minutes)
+    WAITED=0
+    TEXT_READY=false
+    while [ $WAITED -lt $MAX_WAIT ]; do
+        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$TEXT_MODEL\""; then
+            TEXT_READY=true
+            break
+        fi
+        echo "  Text model '$TEXT_MODEL' not yet available, waiting... (${WAITED}s)"
+        sleep 10
+        WAITED=$((WAITED + 10))
+    done
+
+    if [ "$TEXT_READY" = "true" ]; then
+        echo "Text model '$TEXT_MODEL' is ready!"
+    else
+        echo "WARNING: Text model '$TEXT_MODEL' not available after ${MAX_WAIT}s"
+    fi
+
+    if [ "$VISION_READY" = "true" ] && [ "$TEXT_READY" = "true" ]; then
+        echo "All models ready!"
+    else
+        echo "WARNING: Some models not available, starting anyway (may use fallback)"
     fi
 fi
 

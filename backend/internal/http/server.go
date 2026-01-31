@@ -214,9 +214,16 @@ func initOllamaClient(maxTokens int, temperature float64) ai.Client {
 		baseURL = "http://ollama:11434"
 	}
 
+	// Vision model for describing images
 	model := os.Getenv("AI_MODEL")
 	if model == "" {
 		model = "llava:7b"
+	}
+
+	// Text model for making decisions (faster, better at instructions)
+	textModel := os.Getenv("AI_TEXT_MODEL")
+	if textModel == "" {
+		textModel = "llama3.2:3b"
 	}
 
 	// Longer default timeout for local inference
@@ -227,11 +234,12 @@ func initOllamaClient(maxTokens int, temperature float64) ai.Client {
 		}
 	}
 
-	log.Printf("AI bots enabled (provider: local/ollama, model: %s, url: %s, timeout: %dms)", model, baseURL, timeoutMs)
+	log.Printf("AI bots enabled (provider: local/ollama, vision: %s, text: %s, url: %s, timeout: %dms)", model, textModel, baseURL, timeoutMs)
 
 	return ai.NewOllamaClient(ai.OllamaConfig{
 		BaseURL:     baseURL,
 		Model:       model,
+		TextModel:   textModel,
 		MaxTokens:   maxTokens,
 		Temperature: temperature,
 		Timeout:     time.Duration(timeoutMs) * time.Millisecond,

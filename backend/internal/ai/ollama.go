@@ -14,13 +14,15 @@ import (
 // OllamaConfig holds configuration for the Ollama client
 type OllamaConfig struct {
 	BaseURL     string
-	Model       string
+	Model       string        // Vision model (e.g., llava:7b) for image description
+	TextModel   string        // Text model (e.g., llama3.2:3b) for decision making
 	MaxTokens   int
 	Temperature float64
 	Timeout     time.Duration
 }
 
 // OllamaClient implements the Client interface using Ollama's OpenAI-compatible API
+// Uses a two-stage pipeline: vision model describes images, text model makes decisions
 type OllamaClient struct {
 	config     OllamaConfig
 	httpClient *http.Client
@@ -31,6 +33,9 @@ func NewOllamaClient(config OllamaConfig) *OllamaClient {
 	if config.Model == "" {
 		config.Model = "llava:7b"
 	}
+	if config.TextModel == "" {
+		config.TextModel = "llama3.2:3b" // Default text model for decisions
+	}
 	if config.MaxTokens == 0 {
 		config.MaxTokens = 250
 	}
@@ -38,7 +43,7 @@ func NewOllamaClient(config OllamaConfig) *OllamaClient {
 		config.Temperature = 0.7
 	}
 	if config.Timeout == 0 {
-		config.Timeout = 180 * time.Second // Longer timeout for local vision inference (5 images)
+		config.Timeout = 180 * time.Second // Longer timeout for local vision inference
 	}
 	if config.BaseURL == "" {
 		config.BaseURL = "http://ollama:11434"
@@ -107,61 +112,49 @@ type ollamaResponse struct {
 	} `json:"error"`
 }
 
-// Storytell implements Client.Storytell
+// Storytell implements Client.Storytell using two-stage pipeline:
+// 1. Vision model (LLaVA) describes each card
+// 2. Text model picks a card and creates a clue based on descriptions
 func (c *OllamaClient) Storytell(hand []CardWithThumb) (*StorytellerResponse, error) {
-	// Build content with images FIRST, then question at the END
-	// LLaVA responds better to "look at images, then answer" format
-	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: "Here are your cards for Dixit:"},
-	}
-
-	for i, card := range hand {
-		content = append(content,
-			ollamaTextContent{Type: "text", Text: fmt.Sprintf("Card %d:", i+1)},
-			ollamaImageContent{
-				Type: "image_url",
-				ImageURL: ollamaImgURL{
-					URL:    card.DataURL,
-					Detail: "low",
-				},
-			},
-		)
-	}
-
-	// Add the question AFTER all images - LLaVA follows this better
-	question := fmt.Sprintf(`You must pick ONE card (1-%d) and give a short clue (2-5 words) that hints at it without being obvious.
-
-Answer with ONLY: Card X, clue: "your clue"
-Example: Card 2, clue: "dreams of tomorrow"
-
-Which card do you pick and what is your clue?`, len(hand))
-	content = append(content, ollamaTextContent{Type: "text", Text: question})
-
-	respBody, err := c.sendRequest(content)
+	// Stage 1: Get descriptions from vision model
+	descriptions, err := c.describeCards(hand)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to describe cards: %w", err)
 	}
 
-	// Clean markdown code blocks from response
-	cleanedBody := cleanOllamaJSONResponse(respBody)
+	// Stage 2: Ask text model to pick a card and create a clue
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString("You are playing Dixit as the storyteller. Here are your cards:\n\n")
+	for i, desc := range descriptions {
+		promptBuilder.WriteString(fmt.Sprintf("Card %d: %s\n", i+1, desc))
+	}
+	promptBuilder.WriteString(fmt.Sprintf(`
+Pick ONE card (1-%d) and create a short, evocative clue (2-5 words).
+The clue should be abstract - use metaphor, emotion, or theme. Don't be too obvious.
 
+Respond in this format only:
+Card: [number]
+Clue: [your clue]`, len(hand)))
+
+	respBody, err := c.sendTextRequest(promptBuilder.String())
+	if err != nil {
+		return nil, fmt.Errorf("text model failed: %w", err)
+	}
+
+	// Parse the response
 	var response StorytellerResponse
-	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		// Try fallback parsing for non-JSON responses
-		cardNum := extractCardNumber(respBody, len(hand))
-		clue := extractClue(respBody)
+	cardNum := extractCardNumber(respBody, len(hand))
+	clue := extractClue(respBody)
 
-		if cardNum > 0 {
-			response.SelectedCard = cardNum
-			if clue != "" {
-				response.Clue = clue
-			} else {
-				// Generate a generic clue if model didn't provide one
-				response.Clue = "mysterious journey"
-			}
+	if cardNum > 0 {
+		response.SelectedCard = cardNum
+		if clue != "" {
+			response.Clue = clue
 		} else {
-			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+			response.Clue = "mysterious journey"
 		}
+	} else {
+		return nil, fmt.Errorf("failed to parse response: %s", respBody)
 	}
 
 	// Validate response
@@ -175,51 +168,38 @@ Which card do you pick and what is your clue?`, len(hand))
 	return &response, nil
 }
 
-// Submit implements Client.Submit
+// Submit implements Client.Submit using two-stage pipeline
 func (c *OllamaClient) Submit(hand []CardWithThumb, clue string) (*SubmitResponse, error) {
-	// Build content with images FIRST, then question at the END
-	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: "Here are your cards:"},
-	}
-
-	for i, card := range hand {
-		content = append(content,
-			ollamaTextContent{Type: "text", Text: fmt.Sprintf("Card %d:", i+1)},
-			ollamaImageContent{
-				Type: "image_url",
-				ImageURL: ollamaImgURL{
-					URL:    card.DataURL,
-					Detail: "low",
-				},
-			},
-		)
-	}
-
-	// Add the question AFTER all images
-	question := fmt.Sprintf(`The clue is: "%s"
-
-Which card (1-%d) best matches this clue? Consider mood and theme, not literal meaning.
-
-Answer with ONLY the card number, like: Card 3`, clue, len(hand))
-	content = append(content, ollamaTextContent{Type: "text", Text: question})
-
-	respBody, err := c.sendRequest(content)
+	// Stage 1: Get descriptions from vision model
+	descriptions, err := c.describeCards(hand)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to describe cards: %w", err)
 	}
 
-	// Clean markdown code blocks from response
-	cleanedBody := cleanOllamaJSONResponse(respBody)
+	// Stage 2: Ask text model to pick a card that matches the clue
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit. The clue is: \"%s\"\n\nHere are your cards:\n\n", clue))
+	for i, desc := range descriptions {
+		promptBuilder.WriteString(fmt.Sprintf("Card %d: %s\n", i+1, desc))
+	}
+	promptBuilder.WriteString(fmt.Sprintf(`
+Which card (1-%d) best matches the clue "%s"? Consider mood, theme, and symbolism.
 
+Respond with only the card number, like:
+Card: 2`, len(hand), clue))
+
+	respBody, err := c.sendTextRequest(promptBuilder.String())
+	if err != nil {
+		return nil, fmt.Errorf("text model failed: %w", err)
+	}
+
+	// Parse the response
 	var response SubmitResponse
-	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		// Try fallback parsing for non-JSON responses
-		cardNum := extractCardNumber(respBody, len(hand))
-		if cardNum > 0 {
-			response.SelectedCard = cardNum
-		} else {
-			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
-		}
+	cardNum := extractCardNumber(respBody, len(hand))
+	if cardNum > 0 {
+		response.SelectedCard = cardNum
+	} else {
+		return nil, fmt.Errorf("failed to parse response: %s", respBody)
 	}
 
 	// Validate response
@@ -230,64 +210,51 @@ Answer with ONLY the card number, like: Card 3`, clue, len(hand))
 	return &response, nil
 }
 
-// Vote implements Client.Vote
+// Vote implements Client.Vote using two-stage pipeline
 func (c *OllamaClient) Vote(submissions []CardWithThumb, clue string, ownIndex int) (*VoteResponse, error) {
-	// Build content with images FIRST, then question at the END
-	content := []interface{}{
-		ollamaTextContent{Type: "text", Text: "Here are the cards on the table:"},
-	}
-
-	for i, card := range submissions {
-		label := fmt.Sprintf("Card %d:", i+1)
-		if i+1 == ownIndex {
-			label = fmt.Sprintf("Card %d (this is YOUR card):", i+1)
-		}
-		content = append(content,
-			ollamaTextContent{Type: "text", Text: label},
-			ollamaImageContent{
-				Type: "image_url",
-				ImageURL: ollamaImgURL{
-					URL:    card.DataURL,
-					Detail: "low",
-				},
-			},
-		)
-	}
-
-	// Add the question AFTER all images
-	question := fmt.Sprintf(`The clue is: "%s"
-
-Which card (1-%d) do you think the storyteller chose? You cannot pick Card %d (your own card).
-
-Answer with ONLY the card number, like: Card 2`, clue, len(submissions), ownIndex)
-	content = append(content, ollamaTextContent{Type: "text", Text: question})
-
-	respBody, err := c.sendRequest(content)
+	// Stage 1: Get descriptions from vision model
+	descriptions, err := c.describeCards(submissions)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to describe cards: %w", err)
 	}
 
-	// Clean markdown code blocks from response
-	cleanedBody := cleanOllamaJSONResponse(respBody)
-
-	var response VoteResponse
-	if err := json.Unmarshal([]byte(cleanedBody), &response); err != nil {
-		// Try fallback parsing for non-JSON responses
-		cardNum := extractCardNumber(respBody, len(submissions))
-		if cardNum > 0 && cardNum != ownIndex {
-			response.SelectedCard = cardNum
-		} else if cardNum == ownIndex {
-			// Model picked its own card, try to find another number
-			// Default to first valid card that isn't own
-			for i := 1; i <= len(submissions); i++ {
-				if i != ownIndex {
-					response.SelectedCard = i
-					break
-				}
-			}
+	// Stage 2: Ask text model to vote for the best matching card
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit. The clue is: \"%s\"\n\nHere are the cards on the table:\n\n", clue))
+	for i, desc := range descriptions {
+		if i+1 == ownIndex {
+			promptBuilder.WriteString(fmt.Sprintf("Card %d (YOUR CARD - you cannot vote for this): %s\n", i+1, desc))
 		} else {
-			return nil, fmt.Errorf("failed to parse response: %w (body: %s)", err, respBody)
+			promptBuilder.WriteString(fmt.Sprintf("Card %d: %s\n", i+1, desc))
 		}
+	}
+	promptBuilder.WriteString(fmt.Sprintf(`
+Which card (1-%d) do you think the storyteller originally chose for the clue "%s"?
+IMPORTANT: You cannot vote for Card %d (your own card).
+
+Respond with only the card number, like:
+Card: 2`, len(submissions), clue, ownIndex))
+
+	respBody, err := c.sendTextRequest(promptBuilder.String())
+	if err != nil {
+		return nil, fmt.Errorf("text model failed: %w", err)
+	}
+
+	// Parse the response
+	var response VoteResponse
+	cardNum := extractCardNumber(respBody, len(submissions))
+	if cardNum > 0 && cardNum != ownIndex {
+		response.SelectedCard = cardNum
+	} else if cardNum == ownIndex {
+		// Model picked its own card, pick first valid alternative
+		for i := 1; i <= len(submissions); i++ {
+			if i != ownIndex {
+				response.SelectedCard = i
+				break
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("failed to parse response: %s", respBody)
 	}
 
 	// Validate response
@@ -356,6 +323,98 @@ func (c *OllamaClient) sendRequest(content []interface{}) (string, error) {
 	}
 
 	return ollamaResp.Choices[0].Message.Content, nil
+}
+
+// sendTextRequest sends a text-only request to the text model
+func (c *OllamaClient) sendTextRequest(prompt string) (string, error) {
+	content := []interface{}{
+		ollamaTextContent{Type: "text", Text: prompt},
+	}
+
+	reqBody := ollamaRequest{
+		Model: c.config.TextModel, // Use text model instead of vision model
+		Messages: []ollamaMessage{
+			{
+				Role:    "user",
+				Content: content,
+			},
+		},
+		MaxTokens:   c.config.MaxTokens,
+		Temperature: c.config.Temperature,
+		Stream:      false,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := c.config.BaseURL + "/v1/chat/completions"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var ollamaResp ollamaResponse
+	if err := json.Unmarshal(body, &ollamaResp); err != nil {
+		return "", fmt.Errorf("failed to parse Ollama response: %w (status: %d, body: %s)", err, resp.StatusCode, string(body))
+	}
+
+	if ollamaResp.Error != nil {
+		return "", fmt.Errorf("Ollama API error: %s", ollamaResp.Error.Message)
+	}
+
+	if len(ollamaResp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in Ollama response")
+	}
+
+	return ollamaResp.Choices[0].Message.Content, nil
+}
+
+// describeCard uses the vision model to describe a single card image
+func (c *OllamaClient) describeCard(card CardWithThumb) (string, error) {
+	content := []interface{}{
+		ollamaImageContent{
+			Type: "image_url",
+			ImageURL: ollamaImgURL{
+				URL:    card.DataURL,
+				Detail: "low",
+			},
+		},
+		ollamaTextContent{Type: "text", Text: "Describe this fantasy card image in 2-3 sentences. Focus on the main subject, mood, colors, and any symbols or themes."},
+	}
+
+	return c.sendRequest(content)
+}
+
+// describeCards describes multiple cards and returns a formatted string
+func (c *OllamaClient) describeCards(cards []CardWithThumb) ([]string, error) {
+	descriptions := make([]string, len(cards))
+
+	for i, card := range cards {
+		desc, err := c.describeCard(card)
+		if err != nil {
+			// Use a fallback description if vision fails
+			descriptions[i] = "A fantasy illustration"
+		} else {
+			descriptions[i] = strings.TrimSpace(desc)
+		}
+	}
+
+	return descriptions, nil
 }
 
 // cleanOllamaJSONResponse strips markdown code blocks and extra whitespace from AI responses

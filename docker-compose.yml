@@ -16,6 +16,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LOCAL_AI_URL=${LOCAL_AI_URL:-http://ollama:11434}
       - AI_MODEL=${AI_MODEL:-}
+      - AI_TEXT_MODEL=${AI_TEXT_MODEL:-}
       - AI_TIMEOUT_MS=${AI_TIMEOUT_MS:-180000}
       - AI_MAX_TOKENS=${AI_MAX_TOKENS:-250}
       - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
@@ -68,14 +69,15 @@ services:
     profiles:
       - local-ai
 
-  # Model initialization service - pulls the model on first run
+  # Model initialization service - pulls both vision and text models on first run
   ollama-init:
     image: ollama/ollama:latest
     volumes:
       - ollama_models:/root/.ollama
     environment:
       - OLLAMA_HOST=ollama
-      - OLLAMA_MODEL=${AI_MODEL:-llava:7b}
+      - OLLAMA_VISION_MODEL=${AI_MODEL:-llava:7b}
+      - OLLAMA_TEXT_MODEL=${AI_TEXT_MODEL:-llama3.2:3b}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -85,17 +87,31 @@ services:
         done
         echo "Ollama server ready"
 
-        MODEL=$${OLLAMA_MODEL}
-        echo "Checking for model: $$MODEL"
-
-        if curl -s http://ollama:11434/api/tags | grep -q "\"name\":\"$$MODEL\""; then
-          echo "Model $$MODEL already exists, skipping download"
+        # Pull vision model (LLaVA for image description)
+        VISION=$${OLLAMA_VISION_MODEL}
+        echo "Checking for vision model: $$VISION"
+        if curl -s http://ollama:11434/api/tags | grep -q "\"name\":\"$$VISION\""; then
+          echo "Vision model $$VISION already exists, skipping download"
         else
-          echo "Pulling model $$MODEL (this may take several minutes)..."
-          curl -X POST http://ollama:11434/api/pull -d "{\"name\": \"$$MODEL\"}" --no-buffer
+          echo "Pulling vision model $$VISION (this may take several minutes)..."
+          curl -X POST http://ollama:11434/api/pull -d "{\"name\": \"$$VISION\"}" --no-buffer
           echo ""
-          echo "Model $$MODEL downloaded successfully"
+          echo "Vision model $$VISION downloaded successfully"
         fi
+
+        # Pull text model (for decision making)
+        TEXT=$${OLLAMA_TEXT_MODEL}
+        echo "Checking for text model: $$TEXT"
+        if curl -s http://ollama:11434/api/tags | grep -q "\"name\":\"$$TEXT\""; then
+          echo "Text model $$TEXT already exists, skipping download"
+        else
+          echo "Pulling text model $$TEXT (this may take a few minutes)..."
+          curl -X POST http://ollama:11434/api/pull -d "{\"name\": \"$$TEXT\"}" --no-buffer
+          echo ""
+          echo "Text model $$TEXT downloaded successfully"
+        fi
+
+        echo "All models ready!"
     depends_on:
       ollama:
         condition: service_healthy
