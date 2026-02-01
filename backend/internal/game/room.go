@@ -511,8 +511,7 @@ func (r *Room) CalculateRoundScores() *RoundResult {
 		}
 	}
 
-	result := CalculateScores(r.State.StorytellerID, r.State.Submissions, votes, r.Players)
-	result.StorytellerCardIndex = storytellerCardIndex
+	result := CalculateScores(r.State.StorytellerID, storytellerCardIndex, r.State.Submissions, votes, r.Players)
 
 	ApplyScores(result, r.Players)
 
