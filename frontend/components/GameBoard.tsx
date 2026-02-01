@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { useGame } from '@/lib/gameContext'
+import { useAmbientMusic } from '@/lib/useAmbientMusic'
 import Hand from './Hand'
 import PlayerList from './PlayerList'
 import VotingArea from './VotingArea'
 import Scoreboard from './Scoreboard'
 import Card from './Card'
+import { AudioToggle } from './AudioToggle'
 
 export default function GameBoard() {
   const { state, ws } = useGame()
+  const { isMuted, toggleMute } = useAmbientMusic()
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [clue, setClue] = useState('')
   const [selectedVote, setSelectedVote] = useState<number | null>(null)
@@ -250,10 +253,13 @@ export default function GameBoard() {
             <span className="text-gray-400">Round</span>
             <span className="text-2xl font-bold text-white">{round}</span>
           </div>
-          <div className="px-4 py-2 bg-primary/20 rounded-lg">
-            <span className="text-primary font-semibold">
-              {phase.replace(/_/g, ' ')}
-            </span>
+          <div className="flex items-center gap-3">
+            <AudioToggle isMuted={isMuted} onToggle={toggleMute} />
+            <div className="px-4 py-2 bg-primary/20 rounded-lg">
+              <span className="text-primary font-semibold">
+                {phase.replace(/_/g, ' ')}
+              </span>
+            </div>
           </div>
         </div>
 
