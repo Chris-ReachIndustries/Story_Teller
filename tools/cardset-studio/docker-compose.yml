@@ -2,7 +2,8 @@ services:
   studio:
     build: .
     ports:
-      - "3001:3001"
+      - "3001:3001"  # Backend API
+      - "3002:3002"  # Frontend UI
     volumes:
       - ./output:/app/output           # Work in progress sets
       - ../../cards:/app/dixit-cards   # Export destination (main repo)

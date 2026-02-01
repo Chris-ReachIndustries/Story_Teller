@@ -11,15 +11,11 @@ WORKDIR /build
 # Install build dependencies
 RUN apk add --no-cache git
 
-# Copy go mod files
-COPY backend/go.mod backend/go.sum ./
-RUN go mod download
-
-# Copy source
+# Copy go mod files and source
 COPY backend/ .
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o /studio ./cmd/studio
+# Download dependencies and build
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o /studio ./cmd/studio
 
 # ============================================
 # Stage 2: Build Next.js frontend
@@ -32,7 +28,7 @@ WORKDIR /build
 COPY frontend/package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source
 COPY frontend/ .
@@ -63,7 +59,7 @@ COPY --from=backend-builder /studio /app/studio
 # Copy Next.js standalone build
 COPY --from=frontend-builder /build/.next/standalone /app/frontend
 COPY --from=frontend-builder /build/.next/static /app/frontend/.next/static
-COPY --from=frontend-builder /build/public /app/frontend/public
+COPY --from=frontend-builder /build/public /app/frontend/public/
 
 # Create output directories
 RUN mkdir -p /app/output /app/dixit-cards
@@ -82,10 +78,10 @@ EXPOSE 3001 3002
 # Create startup script
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "Starting Card Set Studio..."' >> /app/start.sh && \
-    echo '# Start backend' >> /app/start.sh && \
+    echo '# Start backend on port 3001' >> /app/start.sh && \
     echo '/app/studio &' >> /app/start.sh && \
-    echo '# Start frontend' >> /app/start.sh && \
-    echo 'cd /app/frontend && node server.js &' >> /app/start.sh && \
+    echo '# Start frontend on port 3002' >> /app/start.sh && \
+    echo 'cd /app/frontend && PORT=3002 node server.js &' >> /app/start.sh && \
     echo '# Wait for any process to exit' >> /app/start.sh && \
     echo 'wait -n' >> /app/start.sh && \
     echo '# Exit with status of process that exited first' >> /app/start.sh && \
