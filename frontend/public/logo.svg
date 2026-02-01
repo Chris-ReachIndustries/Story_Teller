@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 48" fill="none">
+  <!-- Book icon -->
+  <g transform="translate(0, 4)">
+    <!-- Book pages -->
+    <path d="M4 8C4 6 6 4 8 4H18C20 4 22 6 22 8V36C22 38 20 40 18 40H8C6 40 4 38 4 36V8Z" fill="#6366f1"/>
+    <path d="M22 8C22 6 24 4 26 4H36C38 4 40 6 40 8V36C40 38 38 40 36 40H26C24 40 22 38 22 36V8Z" fill="#8b5cf6"/>
+    <!-- Book spine -->
+    <path d="M20 4H24V40H20V4Z" fill="#4f46e5"/>
+    <!-- Page lines -->
+    <path d="M8 12H16M8 18H14M8 24H16M8 30H12" stroke="white" stroke-opacity="0.3" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M28 12H36M28 18H34M28 24H36M28 30H32" stroke="white" stroke-opacity="0.3" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Sparkles -->
+    <circle cx="34" cy="6" r="2" fill="#f59e0b"/>
+    <circle cx="40" cy="12" r="1.5" fill="#fbbf24"/>
+    <circle cx="38" cy="2" r="1" fill="#fcd34d"/>
+  </g>
+  <!-- Text: Story Teller -->
+  <text x="52" y="34" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700">
+    <tspan fill="#6366f1">Story</tspan>
+    <tspan fill="#8b5cf6" dx="4">Teller</tspan>
+  </text>
+</svg>

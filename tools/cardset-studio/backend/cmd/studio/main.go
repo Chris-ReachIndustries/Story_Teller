@@ -74,9 +74,12 @@ func main() {
 
 			r.Post("/{setID}/concepts", handler.GenerateConcepts)
 			r.Put("/{setID}/concepts/{cardID}", handler.UpdateConcept)
+			r.Post("/{setID}/concepts/{cardID}/regenerate", handler.RegenerateConceptText)
 
 			r.Post("/{setID}/generate", handler.StartGeneration)
+			r.Get("/{setID}/generate/progress", handler.GetProgress)
 			r.Post("/{setID}/generate/pause", handler.PauseGeneration)
+			r.Post("/{setID}/generate/cancel", handler.CancelGeneration)
 
 			r.Get("/{setID}/cards", handler.ListCards)
 			r.Get("/{setID}/cards/{cardID}/image", handler.GetCardImage)

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('Dixit Game', () => {
+test.describe('Story Teller Game', () => {
   test('creates and joins a room with 3 players', async ({ browser }) => {
     // Create 3 browser contexts for 3 players
     const player1Context = await browser.newContext()
@@ -61,8 +61,8 @@ test.describe('Dixit Game', () => {
   test('homepage displays correctly', async ({ page }) => {
     await page.goto('/')
 
-    // Check title
-    await expect(page.locator('h1:has-text("Dixit")')).toBeVisible()
+    // Check logo
+    await expect(page.locator('img[alt="Story Teller"]')).toBeVisible()
 
     // Check name input
     await expect(page.locator('input[placeholder="Enter your name"]')).toBeVisible()
