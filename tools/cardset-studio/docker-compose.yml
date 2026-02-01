@@ -62,26 +62,34 @@ services:
     networks:
       - studio-network
 
+  # Stable Diffusion WebUI for high-quality image generation
+  # Requires NVIDIA GPU with 8GB+ VRAM for SDXL models
+  # See MODELS.md for model download instructions
   stable-diffusion:
     image: ghcr.io/ai-dock/stable-diffusion-webui:latest
     ports:
       - "7860:7860"
     volumes:
-      - sd_models:/opt/stable-diffusion-webui/models
+      - sd_models:/opt/stable-diffusion-webui/models/Stable-diffusion
+      - sd_outputs:/opt/stable-diffusion-webui/outputs
     environment:
-      - COMMANDLINE_ARGS=--api --xformers --listen
+      # --no-half-vae improves SDXL image quality
+      # --enable-insecure-extension-access allows API model switching
+      - COMMANDLINE_ARGS=--api --xformers --listen --no-half-vae --enable-insecure-extension-access
+      - WEB_ENABLE_AUTH=false
+      - WEBUI_PORT=7860
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7860/sdapi/v1/sd-models"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 180s  # SD takes time to load models
+      retries: 10  # More retries for SDXL models
+      start_period: 300s  # SDXL models need more time to load (~5 min)
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
     networks:
       - studio-network
@@ -95,3 +103,5 @@ volumes:
     name: cardset_studio_ollama
   sd_models:
     name: cardset_studio_sd
+  sd_outputs:
+    name: cardset_studio_sd_outputs

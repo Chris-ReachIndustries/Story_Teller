@@ -23,6 +23,10 @@ func NewGenerator(sdURL string) *Generator {
 		sdURL: sdURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Minute, // SD can be slow
+			// Don't follow redirects - SD API shouldn't redirect
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 	}
 }
@@ -37,6 +41,7 @@ type GenerationSettings struct {
 	Height         int     `json:"height"`
 	Sampler        string  `json:"sampler_name"`
 	Seed           int64   `json:"seed"`
+	Model          string  `json:"model,omitempty"` // SD model checkpoint to use
 }
 
 // DefaultSettings returns default generation settings
@@ -54,18 +59,19 @@ func DefaultSettings() GenerationSettings {
 
 // txt2imgRequest is the A1111 API request format
 type txt2imgRequest struct {
-	Prompt           string  `json:"prompt"`
-	NegativePrompt   string  `json:"negative_prompt"`
-	Steps            int     `json:"steps"`
-	CFGScale         float64 `json:"cfg_scale"`
-	Width            int     `json:"width"`
-	Height           int     `json:"height"`
-	SamplerName      string  `json:"sampler_name"`
-	Seed             int64   `json:"seed"`
-	BatchSize        int     `json:"batch_size"`
-	NIter            int     `json:"n_iter"`
-	SaveImages       bool    `json:"save_images"`
-	SendImages       bool    `json:"send_images"`
+	Prompt           string                 `json:"prompt"`
+	NegativePrompt   string                 `json:"negative_prompt"`
+	Steps            int                    `json:"steps"`
+	CFGScale         float64                `json:"cfg_scale"`
+	Width            int                    `json:"width"`
+	Height           int                    `json:"height"`
+	SamplerName      string                 `json:"sampler_name"`
+	Seed             int64                  `json:"seed"`
+	BatchSize        int                    `json:"batch_size"`
+	NIter            int                    `json:"n_iter"`
+	SaveImages       bool                   `json:"save_images"`
+	SendImages       bool                   `json:"send_images"`
+	OverrideSettings map[string]interface{} `json:"override_settings,omitempty"`
 }
 
 // txt2imgResponse is the A1111 API response format
@@ -92,6 +98,13 @@ func (g *Generator) Generate(prompt string, settings GenerationSettings, outputP
 		SendImages:     true,
 	}
 
+	// Add model override if specified
+	if settings.Model != "" {
+		req.OverrideSettings = map[string]interface{}{
+			"sd_model_checkpoint": settings.Model,
+		}
+	}
+
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -111,6 +124,11 @@ func (g *Generator) Generate(prompt string, settings GenerationSettings, outputP
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		location := resp.Header.Get("Location")
+		return fmt.Errorf("SD API redirected (status %d) to %s - check if auth is disabled", resp.StatusCode, location)
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -9,6 +9,7 @@ import {
   HealthResponse,
   ListSetsResponse,
   Concept,
+  QualityMode,
 } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
@@ -88,20 +89,40 @@ class APIClient {
     })
   }
 
+  // Regenerate concept text (title/prompt) using AI
+  async regenerateConceptText(
+    setId: string,
+    cardId: string,
+    options: { regenerateTitle?: boolean; regeneratePrompt?: boolean }
+  ): Promise<Concept> {
+    return this.request(`/sets/${setId}/concepts/${cardId}/regenerate`, {
+      method: 'POST',
+      body: JSON.stringify(options),
+    })
+  }
+
   // Start image generation
   async startGeneration(
     setId: string,
+    qualityMode: QualityMode = 'high',
     data: GenerateImagesRequest = {}
   ): Promise<GenerationProgress> {
     return this.request(`/sets/${setId}/generate`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, qualityMode }),
     })
   }
 
   // Pause generation
   async pauseGeneration(setId: string): Promise<GenerationProgress> {
     return this.request(`/sets/${setId}/generate/pause`, {
+      method: 'POST',
+    })
+  }
+
+  // Cancel generation
+  async cancelGeneration(setId: string): Promise<{ status: string }> {
+    return this.request(`/sets/${setId}/generate/cancel`, {
       method: 'POST',
     })
   }

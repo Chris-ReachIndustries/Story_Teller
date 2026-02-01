@@ -34,8 +34,27 @@ A standalone tool for creating Dixit card sets using AI-generated images.
 ## Requirements
 
 - Docker with Docker Compose
-- NVIDIA GPU with 8GB+ VRAM (recommended)
+- NVIDIA GPU (see hardware requirements below)
 - Git LFS installed (for exporting card sets)
+
+### Hardware Requirements
+
+For high-quality SDXL image generation:
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| GPU VRAM | 8 GB | 12+ GB |
+| System RAM | 16 GB | 32 GB |
+| Storage | 20 GB | 50 GB |
+| GPU | RTX 3060 | RTX 3080/4070+ |
+
+### Expected Generation Times
+
+| Quality Mode | Time per Image | Resolution |
+|--------------|----------------|------------|
+| Fast | 15-25 seconds | 512x768 |
+| Normal | 40-60 seconds | 768x1024 |
+| High | 75-120 seconds | 896x1152 |
 
 ## Quick Start
 
@@ -64,8 +83,21 @@ A standalone tool for creating Dixit card sets using AI-generated images.
 
 1. Click "New Set" on the home page
 2. Enter a name (e.g., "Fantasy Ocean")
-3. Enter a theme description (e.g., "underwater fantasy creatures, bioluminescent scenes")
+3. Enter a detailed theme description (see tips below)
 4. Choose number of cards (default: 100)
+
+**Theme Description Tips:**
+
+Detailed themes produce better visual coherence across all cards:
+
+- **Good:** "Underwater fantasy world with bioluminescent creatures, ancient coral castles, ethereal jellyfish, deep ocean blues and vibrant teals, mystical atmosphere"
+- **Less effective:** "ocean fantasy"
+
+The theme influences:
+- Color palette across all cards
+- Art style consistency
+- Mood and atmosphere
+- Visual coherence between cards
 
 ### 2. Generate Concepts
 
@@ -76,10 +108,14 @@ A standalone tool for creating Dixit card sets using AI-generated images.
 
 ### 3. Generate Images
 
-1. Click "Start Generation"
-2. Watch progress as images are generated
-3. Pause/resume at any time
-4. Generation continues in background
+1. **Select quality mode:**
+   - **Fast:** Quick previews, lower resolution (~20s/image)
+   - **Normal:** Good balance (~45s/image)
+   - **High:** Best quality, recommended for final output (~90s/image)
+2. Click "Start Generation"
+3. Watch progress as images are generated
+4. Pause/resume or cancel at any time
+5. All cards in a set share a consistent visual style derived from the theme
 
 ### 4. Review Cards
 
@@ -126,12 +162,14 @@ git push
 
 ### Stable Diffusion Settings
 
-Edit generation settings in the Generate page:
-- Model selection
-- Steps (default: 30)
-- CFG Scale (default: 7)
-- Sampler (default: DPM++ 2M Karras)
-- Image size (default: 512x768)
+Default high-quality settings (configurable per quality mode):
+- Model: JuggernautXL v9 (SDXL)
+- Steps: 45 (High mode), 30 (Normal), 20 (Fast)
+- CFG Scale: 8.0
+- Sampler: DPM++ 2M Karras
+- Resolution: 896x1152 (High), 768x1024 (Normal), 512x768 (Fast)
+
+See [MODELS.md](MODELS.md) for model installation instructions.
 
 ## Development
 
@@ -177,9 +215,12 @@ docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
 
 ### Slow generation
 
-- Reduce image steps (20-30 is usually enough)
-- Use a smaller model
-- Check GPU memory usage
+High-quality SDXL generation is intentionally slower for better results:
+
+- Use "Fast" quality mode for quick previews
+- Switch to "High" mode only for final output
+- Expected times: 20-120 seconds per image depending on mode
+- Check GPU memory usage with `nvidia-smi`
 
 ### Out of memory
 

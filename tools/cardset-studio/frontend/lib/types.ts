@@ -4,6 +4,9 @@ export type SetStatus = 'concept' | 'generating' | 'reviewing' | 'exported'
 // Individual card/concept status
 export type CardStatus = 'pending' | 'generating' | 'generated' | 'approved' | 'rejected'
 
+// Image generation quality mode
+export type QualityMode = 'fast' | 'normal' | 'high'
+
 // A single card concept
 export interface Concept {
   cardId: string
@@ -30,9 +33,11 @@ export interface CardSet {
   id: string
   name: string
   theme: string
+  themeStyle?: string  // Derived art style for visual coherence
   createdAt: string
   updatedAt: string
   status: SetStatus
+  qualityMode?: QualityMode  // Image generation quality level
   concepts: Concept[]
   stats: SetStats
 }
@@ -69,7 +74,7 @@ export interface SDSettings {
 
 // Generation progress
 export interface GenerationProgress {
-  setId: string
+  setId?: string
   total: number
   completed: number
   current?: string

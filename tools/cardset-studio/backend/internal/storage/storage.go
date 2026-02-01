@@ -15,9 +15,10 @@ import (
 type CardStatus string
 
 const (
-	StatusPending  CardStatus = "pending"
-	StatusApproved CardStatus = "approved"
-	StatusRejected CardStatus = "rejected"
+	StatusConceptOnly CardStatus = ""          // Concept exists but no image generated yet
+	StatusGenerated   CardStatus = "generated" // Image generated, awaiting review
+	StatusApproved    CardStatus = "approved"
+	StatusRejected    CardStatus = "rejected"
 )
 
 // Concept represents a card concept with its generation prompt
@@ -51,18 +52,29 @@ const (
 	SetStatusExported   SetStatus = "exported"
 )
 
+// QualityMode represents the image generation quality level
+type QualityMode string
+
+const (
+	QualityFast   QualityMode = "fast"   // Quick preview (~20s/image)
+	QualityNormal QualityMode = "normal" // Balanced (~45s/image)
+	QualityHigh   QualityMode = "high"   // Best quality (~90s/image)
+)
+
 // CardSet represents a card set being created
 type CardSet struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Theme       string     `json:"theme"`
-	CardCount   int        `json:"cardCount"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	Status      SetStatus  `json:"status"`
-	Concepts    []Concept  `json:"concepts"`
-	Stats       SetStats   `json:"stats"`
-	SDSettings  SDSettings `json:"sdSettings"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Theme       string      `json:"theme"`
+	ThemeStyle  string      `json:"themeStyle,omitempty"`  // Derived art style for visual coherence
+	CardCount   int         `json:"cardCount"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Status      SetStatus   `json:"status"`
+	QualityMode QualityMode `json:"qualityMode,omitempty"` // Image generation quality level
+	Concepts    []Concept   `json:"concepts"`
+	Stats       SetStats    `json:"stats"`
+	SDSettings  SDSettings  `json:"sdSettings"`
 }
 
 // SDSettings contains Stable Diffusion generation settings
@@ -76,17 +88,39 @@ type SDSettings struct {
 	NegativePrompt string  `json:"negativePrompt"`
 }
 
-// DefaultSDSettings returns default Stable Diffusion settings
+// DefaultSDSettings returns default high-quality Stable Diffusion settings
 func DefaultSDSettings() SDSettings {
 	return SDSettings{
-		Model:    "dreamshaper_8",
-		Steps:    30,
-		CFGScale: 7.5,
-		Sampler:  "DPM++ 2M Karras",
-		Width:    768,
-		Height:   1152, // Dixit card ratio ~2:3
-		NegativePrompt: "text, watermark, signature, blurry, low quality, deformed, ugly, bad anatomy, cropped, jpeg artifacts",
+		Model:          "juggernautXL_v9Rundiffusion", // SDXL model for high quality
+		Steps:          45,                            // More steps for better quality
+		CFGScale:       8.0,                           // Slightly higher for better prompt adherence
+		Sampler:        "DPM++ 2M Karras",             // Excellent sampler for quality
+		Width:          896,                           // SDXL native resolution
+		Height:         1152,                          // ~2:3 ratio for Dixit cards
+		NegativePrompt: "",                            // Built dynamically by PromptBuilder
 	}
+}
+
+// GetSettingsForMode returns SD settings adjusted for the specified quality mode
+func GetSettingsForMode(mode QualityMode) SDSettings {
+	base := DefaultSDSettings()
+
+	switch mode {
+	case QualityFast:
+		base.Steps = 20
+		base.Width = 512
+		base.Height = 768
+	case QualityNormal:
+		base.Steps = 30
+		base.Width = 768
+		base.Height = 1024
+	case QualityHigh:
+		// Use defaults (45 steps, 896x1152)
+	default:
+		// Default to high quality if not specified
+	}
+
+	return base
 }
 
 // Store manages card set persistence
@@ -119,6 +153,8 @@ func (s *Store) loadAllSets() {
 			if data, err := os.ReadFile(setPath); err == nil {
 				var set CardSet
 				if err := json.Unmarshal(data, &set); err == nil {
+					// Recalculate stats to ensure consistency
+					s.UpdateStats(&set)
 					s.sets[set.ID] = &set
 				}
 			}
@@ -255,9 +291,11 @@ func (s *Store) UpdateStats(set *CardSet) {
 		case StatusRejected:
 			stats.Rejected++
 			stats.Generated++
-		case StatusPending:
-			stats.Pending++
+		case StatusGenerated:
+			stats.Pending++ // "Pending" in stats means "pending review"
 			stats.Generated++
+		case StatusConceptOnly:
+			// Concept only, no image yet - don't count as generated
 		}
 	}
 
