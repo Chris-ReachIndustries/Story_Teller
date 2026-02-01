@@ -1,0 +1,107 @@
+services:
+  studio:
+    build: .
+    ports:
+      - "3001:3001"  # Backend API
+      - "3002:3002"  # Frontend UI
+    volumes:
+      - ./output:/app/output           # Work in progress sets
+      - ../../cards:/app/dixit-cards   # Export destination (main repo)
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - SD_URL=http://stable-diffusion:7860
+      - PORT=3001
+    depends_on:
+      ollama:
+        condition: service_healthy
+      stable-diffusion:
+        condition: service_healthy
+    networks:
+      - studio-network
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - studio-network
+
+  # Pull llama3.2 model on first run
+  ollama-init:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Ollama..."
+        until ollama list > /dev/null 2>&1; do sleep 2; done
+        echo "Pulling llama3.2:3b for concept generation..."
+        ollama pull llama3.2:3b
+        echo "Model ready!"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - studio-network
+
+  # Stable Diffusion WebUI for high-quality image generation
+  # Requires NVIDIA GPU with 8GB+ VRAM for SDXL models
+  # See MODELS.md for model download instructions
+  stable-diffusion:
+    image: ghcr.io/ai-dock/stable-diffusion-webui:latest
+    ports:
+      - "7860:7860"
+    volumes:
+      - sd_models:/opt/stable-diffusion-webui/models/Stable-diffusion
+      - sd_outputs:/opt/stable-diffusion-webui/outputs
+    environment:
+      # --no-half-vae improves SDXL image quality
+      # --enable-insecure-extension-access allows API model switching
+      - COMMANDLINE_ARGS=--api --xformers --listen --no-half-vae --enable-insecure-extension-access
+      - WEB_ENABLE_AUTH=false
+      - WEBUI_PORT=7860
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/sdapi/v1/sd-models"]
+      interval: 30s
+      timeout: 10s
+      retries: 10  # More retries for SDXL models
+      start_period: 300s  # SDXL models need more time to load (~5 min)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - studio-network
+
+networks:
+  studio-network:
+    driver: bridge
+
+volumes:
+  ollama_models:
+    name: cardset_studio_ollama
+  sd_models:
+    name: cardset_studio_sd
+  sd_outputs:
+    name: cardset_studio_sd_outputs

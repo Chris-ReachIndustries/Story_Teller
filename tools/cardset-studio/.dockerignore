@@ -1,0 +1,33 @@
+# Dependencies
+**/node_modules
+**/.pnpm-store
+
+# Build outputs
+**/.next
+**/out
+**/build
+**/dist
+
+# Development files
+**/.git
+**/.gitignore
+**/.env
+**/.env.local
+**/.env*.local
+
+# IDE
+**/.idea
+**/.vscode
+**/*.swp
+**/*.swo
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Documentation
+**/README.md
+**/*.md
+
+# Output directories (will be mounted)
+output/
