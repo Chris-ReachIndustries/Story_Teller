@@ -33,8 +33,8 @@ RUN npm install
 # Copy source
 COPY frontend/ .
 
-# Set API URL for build
-ENV NEXT_PUBLIC_API_URL=/api
+# Set API URL for build (browser will call this directly)
+ENV NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 # Build
 RUN npm run build
