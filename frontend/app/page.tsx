@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useGame } from '@/lib/gameContext'
 import { CardSetInfo } from '@/lib/types'
 import { fetchCardSets } from '@/lib/api'
@@ -58,8 +59,15 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center min-h-screen p-8">
-      <div className="flex flex-col items-center justify-center flex-1 w-full">
-        <h1 className="text-5xl font-bold mb-2 text-primary">Dixit</h1>
+      <div className="flex flex-col items-center justify-center flex-1 w-full animate-fade-in">
+        <Image
+          src="/logo.svg"
+          alt="Story Teller"
+          width={280}
+          height={48}
+          className="mb-2"
+          priority
+        />
         <p className="text-gray-400 mb-8">A game of creative storytelling</p>
 
       {!connected && (

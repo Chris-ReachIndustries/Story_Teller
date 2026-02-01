@@ -1,16 +1,13 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import api from '@/lib/api'
 import { CardSet, ExportResult } from '@/lib/types'
 
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function ExportPage({ params }: PageProps) {
-  const { id } = use(params)
+export default function ExportPage() {
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
   const [set, setSet] = useState<CardSet | null>(null)
   const [loading, setLoading] = useState(true)

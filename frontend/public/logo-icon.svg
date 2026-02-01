@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Book pages -->
+  <path d="M6 10C6 7.79 7.79 6 10 6H20C22.21 6 24 7.79 24 10V38C24 40.21 22.21 42 20 42H10C7.79 42 6 40.21 6 38V10Z" fill="#6366f1"/>
+  <path d="M24 10C24 7.79 25.79 6 28 6H38C40.21 6 42 7.79 42 10V38C42 40.21 40.21 42 38 42H28C25.79 42 24 40.21 24 38V10Z" fill="#8b5cf6"/>
+  <!-- Book spine -->
+  <path d="M22 6H26V42H22V6Z" fill="#4f46e5"/>
+  <!-- Page lines left -->
+  <path d="M10 14H18M10 20H16M10 26H18M10 32H14" stroke="white" stroke-opacity="0.3" stroke-width="2" stroke-linecap="round"/>
+  <!-- Page lines right -->
+  <path d="M30 14H38M30 20H36M30 26H38M30 32H34" stroke="white" stroke-opacity="0.3" stroke-width="2" stroke-linecap="round"/>
+  <!-- Sparkles -->
+  <circle cx="38" cy="8" r="3" fill="#f59e0b"/>
+  <circle cx="44" cy="14" r="2" fill="#fbbf24"/>
+  <circle cx="42" cy="4" r="1.5" fill="#fcd34d"/>
+</svg>

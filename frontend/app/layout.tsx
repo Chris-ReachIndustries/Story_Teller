@@ -6,8 +6,16 @@ import { GameProvider } from '@/lib/gameContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Dixit Online',
-  description: 'A multiplayer online Dixit-style game',
+  title: 'Story Teller',
+  description: 'A multiplayer online storytelling card game',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/logo-icon.svg',
+  },
+  manifest: '/site.webmanifest',
+  themeColor: '#6366f1',
 }
 
 export default function RootLayout({

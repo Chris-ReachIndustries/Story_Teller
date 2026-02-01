@@ -15,16 +15,16 @@ export default function GameRules({ defaultExpanded = false }: GameRulesProps) {
         onClick={() => setExpanded(!expanded)}
         className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors"
       >
-        <h2 className="text-xl font-bold text-white">How to Play Dixit</h2>
+        <h2 className="text-xl font-bold text-white">How to Play Story Teller</h2>
         <span className="text-gray-400 text-2xl">{expanded ? '−' : '+'}</span>
       </button>
 
       {expanded && (
         <div className="px-6 pb-6 space-y-6">
           <section>
-            <h3 className="text-lg font-semibold text-primary mb-2">What is Dixit?</h3>
+            <h3 className="text-lg font-semibold text-primary mb-2">What is Story Teller?</h3>
             <p className="text-gray-300">
-              Dixit is a creative storytelling game where players use beautifully illustrated cards
+              Story Teller is a creative storytelling game where players use beautifully illustrated cards
               to give clues and guess which card belongs to the storyteller. The key is to be just
               vague enough—not too obvious, not too obscure!
             </p>

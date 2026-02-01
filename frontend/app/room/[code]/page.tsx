@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useGame } from '@/lib/gameContext'
+import Header from '@/components/Header'
 import Lobby from '@/components/Lobby'
 import GameBoard from '@/components/GameBoard'
 
@@ -58,27 +59,12 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen p-4 md:p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Dixit</h1>
-          <p className="text-gray-400">
-            Room: <span className="font-mono text-white">{state.room.code}</span>
-          </p>
-        </div>
-        <div className="text-right">
-          {state.you && (
-            <p className="text-gray-400">
-              Playing as <span className="text-white font-semibold">{state.you.name}</span>
-              {state.you.isHost && <span className="ml-2 text-accent">(Host)</span>}
-            </p>
-          )}
-          <div className={`inline-flex items-center gap-2 mt-1 ${connected ? 'text-green-400' : 'text-red-400'}`}>
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}></span>
-            {connected ? 'Connected' : 'Disconnected'}
-          </div>
-        </div>
-      </div>
+      <Header
+        roomCode={state.room.code}
+        playerName={state.you?.name}
+        isHost={state.you?.isHost}
+        connected={connected}
+      />
 
       {/* Reconnect toast */}
       {showReconnectToast && (
