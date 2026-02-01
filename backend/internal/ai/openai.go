@@ -101,7 +101,7 @@ Clue rules:
 - Do NOT mention colors, composition, or camera framing ("top-left", "close up").
 - Avoid unique proper nouns that directly identify the card. Indirect references are okay (myth, proverb, classic story vibe).
 - Prefer: metaphor, emotion, theme, relationship, contradiction, atmosphere, or a vague cultural echo.
-- Clue length: 2–10 words. No emojis. No quotes.
+- Clue length: 2–4 words (max 4). No emojis. No quotes.
 
 Strategy:
 - If your card feels very distinctive, choose a clue that could plausibly match 1–2 other cards.

@@ -202,7 +202,7 @@ $env:AI_PROVIDER="local"
 docker compose --profile local-ai up --build
 ```
 
-**First run downloads two models (~6.5GB total: ~4.5GB for llava:7b + ~2GB for llama3.2:3b).**
+**First run downloads two models.** Default: ~6.5GB (llava:7b + llama3.2:3b). For speed, use `moondream` + `llama3.2:1b` (~3GB total).
 
 **Local AI Configuration:**
 
@@ -213,12 +213,20 @@ docker compose --profile local-ai up --build
 | `AI_MODEL` | llava:7b | Vision model for image description |
 | `AI_TEXT_MODEL` | llama3.2:3b | Text model for game decisions |
 | `AI_TIMEOUT_MS` | 180000 | Request timeout (3 min for local inference) |
+| `AI_VISION_MAX_TOKENS` | 100 | Max tokens per card description (lower = faster) |
+| `AI_DESCRIBE_CONCURRENCY` | 4 | Parallel vision requests for card descriptions |
+
+**Speed-focused setup:** Use smaller models and defaults for fastest local play:
+```bash
+AI_ENABLED=true AI_PROVIDER=local AI_MODEL=moondream AI_TEXT_MODEL=llama3.2:1b docker compose --profile local-ai up --build
+```
 
 **Available Vision Models:**
 
 | Model | Size | Quality | Speed |
 |-------|------|---------|-------|
-| `llava:7b` | 4.5GB | Good | Fastest |
+| `moondream` | ~1.7GB | Good | **Fastest** (recommended for speed) |
+| `llava:7b` | 4.5GB | Good | Fast |
 | `llava:13b` | 8GB | Better | Medium |
 | `llama3.2-vision:11b` | 7GB | Best | Medium |
 
@@ -226,7 +234,8 @@ docker compose --profile local-ai up --build
 
 | Model | Size | Quality | Speed |
 |-------|------|---------|-------|
-| `llama3.2:3b` | 2GB | Good | Fastest |
+| `llama3.2:1b` | ~1.3GB | Good | **Fastest** (recommended for speed) |
+| `llama3.2:3b` | 2GB | Good | Fast |
 | `llama3.2:8b` | 4.7GB | Better | Medium |
 | `mistral:7b` | 4GB | Good | Medium |
 
@@ -245,7 +254,8 @@ AI_ENABLED=true AI_PROVIDER=local AI_MODEL=llava:13b AI_TEXT_MODEL=llama3.2:8b d
 **Troubleshooting Local AI:**
 
 - **Slow first startup**: Model download takes 5-10 minutes. Subsequent starts are fast.
-- **Out of memory**: Use `llava:7b` (smallest) or increase Docker memory limit.
+- **Want faster responses**: Use `AI_MODEL=moondream` and `AI_TEXT_MODEL=llama3.2:1b`; card descriptions run in parallel (up to 4 at once).
+- **Out of memory**: Use `moondream` (smallest vision) and `llama3.2:1b`, or increase Docker memory limit.
 - **No GPU detected**: Install NVIDIA Container Toolkit for GPU support. CPU mode works but is slower.
 - **Connection refused**: Ensure Ollama service is healthy: `docker compose --profile local-ai logs ollama`
 
@@ -505,6 +515,8 @@ Environment variables:
 | `AI_MODEL` | gpt-4o / llava:7b | Vision model (OpenAI or Ollama) |
 | `AI_TEXT_MODEL` | llama3.2:3b | Text model for decisions (local AI only) |
 | `AI_TIMEOUT_MS` | 12000 / 180000 | Request timeout (OpenAI / local) |
+| `AI_VISION_MAX_TOKENS` | 100 | Max tokens per card description (local only) |
+| `AI_DESCRIBE_CONCURRENCY` | 4 | Parallel vision requests (local only) |
 | `CARDS_REGENERATE` | false | Force regenerate card deck |
 | `DALLE_MODEL` | dall-e-3 | DALL-E model for cards |
 | `DALLE_QUALITY` | standard | Image quality (standard/hd) |

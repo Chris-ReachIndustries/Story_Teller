@@ -233,15 +233,31 @@ func initOllamaClient(maxTokens int, temperature float64) ai.Client {
 		}
 	}
 
+	visionMaxTokens := 100
+	if val := os.Getenv("AI_VISION_MAX_TOKENS"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			visionMaxTokens = parsed
+		}
+	}
+
+	describeConcurrency := 4
+	if val := os.Getenv("AI_DESCRIBE_CONCURRENCY"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			describeConcurrency = parsed
+		}
+	}
+
 	log.Printf("AI bots enabled (provider: local/ollama, vision: %s, text: %s, url: %s, timeout: %dms)", model, textModel, baseURL, timeoutMs)
 
 	return ai.NewOllamaClient(ai.OllamaConfig{
-		BaseURL:     baseURL,
-		Model:       model,
-		TextModel:   textModel,
-		MaxTokens:   maxTokens,
-		Temperature: temperature,
-		Timeout:     time.Duration(timeoutMs) * time.Millisecond,
+		BaseURL:             baseURL,
+		Model:               model,
+		TextModel:           textModel,
+		MaxTokens:           maxTokens,
+		VisionMaxTokens:     visionMaxTokens,
+		DescribeConcurrency: describeConcurrency,
+		Temperature:         temperature,
+		Timeout:             time.Duration(timeoutMs) * time.Millisecond,
 	})
 }
 
