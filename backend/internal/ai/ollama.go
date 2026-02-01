@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strings"
@@ -171,7 +172,7 @@ Clue: [your clue]`, len(hand)))
 		if clue != "" {
 			response.Clue = clue
 		} else {
-			response.Clue = "mysterious journey"
+			response.Clue = pickFallbackClue()
 		}
 	} else {
 		return nil, fmt.Errorf("failed to parse response: %s", respBody)
@@ -182,7 +183,7 @@ Clue: [your clue]`, len(hand)))
 		return nil, fmt.Errorf("invalid card selection: %d (must be 1-%d)", response.SelectedCard, len(hand))
 	}
 	if response.Clue == "" {
-		response.Clue = "hidden meaning"
+		response.Clue = pickFallbackClue()
 	}
 
 	return &response, nil
@@ -550,20 +551,57 @@ func parseCardNum(s string, maxCard int) int {
 	return 0
 }
 
-// extractClue attempts to extract a clue from free-form AI response
+// extractClue attempts to extract a clue from free-form AI response.
+// Returns the first valid 2-4 word clue found; trims to one line and max 4 words when needed.
 func extractClue(text string) string {
-	// Pattern 1: "clue": "X" (JSON-ish)
-	cluePattern := regexp.MustCompile(`["']?clue["']?\s*[":]\s*["']([^"']+)["']`)
-	if matches := cluePattern.FindStringSubmatch(text); len(matches) > 1 {
-		return strings.TrimSpace(matches[1])
+	normalize := func(s string) string {
+		s = strings.TrimSpace(s)
+		s = strings.TrimRight(s, ".,!?;")
+		// Strip brackets if model used "Clue: [something]"
+		if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+			s = strings.TrimSpace(s[1 : len(s)-1])
+		}
+		return s
+	}
+	wordCount := func(s string) int { return len(strings.Fields(s)) }
+	trimToMaxWords := func(s string, max int) string {
+		words := strings.Fields(s)
+		if len(words) <= max {
+			return strings.Join(words, " ")
+		}
+		return strings.Join(words[:max], " ")
 	}
 
-	// Pattern 2: After "clue:" or "clue is"
-	colonPattern := regexp.MustCompile(`(?i)clue(?:\s+is)?[:\s]+["']?([^"'\n]+)["']?`)
+	// Pattern 1: "clue": "X" or clue: "X" (JSON-ish or quoted)
+	cluePattern := regexp.MustCompile(`(?i)["']?clue["']?\s*[":]\s*["']([^"']+)["']`)
+	if matches := cluePattern.FindStringSubmatch(text); len(matches) > 1 {
+		clue := normalize(matches[1])
+		clue = trimToMaxWords(clue, 4)
+		if len(clue) >= 2 && wordCount(clue) >= 2 && wordCount(clue) <= 4 {
+			return clue
+		}
+	}
+
+	// Pattern 2: "Clue:" or "Clue -" followed by clue on same line or next line
+	colonPattern := regexp.MustCompile(`(?i)clue(?:\s+is)?[\s:\-–—]+\s*["']?([^"'\n]+)["']?`)
 	if matches := colonPattern.FindStringSubmatch(text); len(matches) > 1 {
-		clue := strings.TrimSpace(matches[1])
-		clue = strings.TrimRight(clue, ".,!?")
-		if len(clue) > 2 && len(clue) <= 120 {
+		clue := normalize(matches[1])
+		// Take first line only in case model added explanation
+		if idx := strings.Index(clue, "\n"); idx >= 0 {
+			clue = strings.TrimSpace(clue[:idx])
+		}
+		clue = trimToMaxWords(clue, 4)
+		if len(clue) >= 2 && wordCount(clue) >= 2 && wordCount(clue) <= 4 {
+			return clue
+		}
+	}
+
+	// Pattern 2b: Clue on its own line after "Clue:" (e.g. "Clue:\n  lost in the woods")
+	nextLinePattern := regexp.MustCompile(`(?i)clue[\s:\-–—]*\n\s*([^\n]+)`)
+	if matches := nextLinePattern.FindStringSubmatch(text); len(matches) > 1 {
+		clue := normalize(matches[1])
+		clue = trimToMaxWords(clue, 4)
+		if len(clue) >= 2 && wordCount(clue) >= 2 && wordCount(clue) <= 4 {
 			return clue
 		}
 	}
@@ -572,13 +610,36 @@ func extractClue(text string) string {
 	quotePattern := regexp.MustCompile(`["']([^"']{5,80})["']`)
 	if matches := quotePattern.FindAllStringSubmatch(text, -1); len(matches) > 0 {
 		for _, m := range matches {
-			clue := strings.TrimSpace(m[1])
-			words := strings.Fields(clue)
-			if len(words) >= 2 && len(words) <= 4 {
+			clue := normalize(m[1])
+			if wordCount(clue) >= 2 && wordCount(clue) <= 4 {
 				return clue
 			}
 		}
 	}
 
+	// Pattern 4: Any line that is just 2-4 words (not "Card: N") — last resort
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		line = normalize(line)
+		if line == "" || strings.HasPrefix(strings.ToLower(line), "card") {
+			continue
+		}
+		words := strings.Fields(line)
+		if len(words) >= 2 && len(words) <= 4 && len(line) <= 50 {
+			return line
+		}
+	}
+
 	return ""
+}
+
+// fallbackClues are used when the model's clue cannot be parsed (avoids always "mysterious journey").
+var fallbackClues = []string{
+	"mysterious journey", "hidden meaning", "lost in dreams", "between two worlds",
+	"what the heart sees", "echoes of memory", "the path unseen", "a moment suspended",
+}
+
+// pickFallbackClue returns a random 2–4 word fallback clue when extraction fails.
+func pickFallbackClue() string {
+	return fallbackClues[rand.Intn(len(fallbackClues))]
 }
