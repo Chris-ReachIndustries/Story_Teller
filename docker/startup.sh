@@ -24,11 +24,12 @@ if [ "$AI_PROVIDER" = "local" ] && [ "$AI_ENABLED" = "true" ]; then
     done
 
     # Wait for vision model (up to 10 minutes)
+    # Ollama may list models as "name" or "name:tag" (e.g. moondream:latest)
     MAX_WAIT=600
     WAITED=0
     VISION_READY=false
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$VISION_MODEL\""; then
+        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -qE "\"name\": *\"${VISION_MODEL}(\"|:)"; then
             VISION_READY=true
             break
         fi
@@ -44,10 +45,11 @@ if [ "$AI_PROVIDER" = "local" ] && [ "$AI_ENABLED" = "true" ]; then
     fi
 
     # Wait for text model (up to 10 minutes)
+    # Ollama may list models as "name" or "name:tag" (e.g. llama3.2:1b:latest)
     WAITED=0
     TEXT_READY=false
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$TEXT_MODEL\""; then
+        if curl -sf "$OLLAMA_URL/api/tags" 2>/dev/null | grep -qE "\"name\": *\"${TEXT_MODEL}(\"|:)"; then
             TEXT_READY=true
             break
         fi

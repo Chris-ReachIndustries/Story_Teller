@@ -8,17 +8,20 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 // OllamaConfig holds configuration for the Ollama client
 type OllamaConfig struct {
-	BaseURL     string
-	Model       string        // Vision model (e.g., llava:7b) for image description
-	TextModel   string        // Text model (e.g., llama3.2:3b) for decision making
-	MaxTokens   int
-	Temperature float64
-	Timeout     time.Duration
+	BaseURL         string
+	Model           string        // Vision model (e.g., llava:7b) for image description
+	TextModel       string        // Text model (e.g., llama3.2:3b) for decision making
+	MaxTokens       int
+	VisionMaxTokens int          // Max tokens for vision descriptions (shorter = faster)
+	Temperature     float64
+	Timeout         time.Duration
+	DescribeConcurrency int       // Max concurrent vision requests (0 = default 4)
 }
 
 // OllamaClient implements the Client interface using Ollama's OpenAI-compatible API
@@ -38,6 +41,12 @@ func NewOllamaClient(config OllamaConfig) *OllamaClient {
 	}
 	if config.MaxTokens == 0 {
 		config.MaxTokens = 250
+	}
+	if config.VisionMaxTokens == 0 {
+		config.VisionMaxTokens = 100 // Shorter descriptions = faster generation
+	}
+	if config.DescribeConcurrency == 0 {
+		config.DescribeConcurrency = 4 // Parallel card descriptions, limit to avoid overloading Ollama
 	}
 	if config.Temperature == 0 {
 		config.Temperature = 0.7
@@ -124,13 +133,24 @@ func (c *OllamaClient) Storytell(hand []CardWithThumb) (*StorytellerResponse, er
 
 	// Stage 2: Ask text model to pick a card and create a clue
 	var promptBuilder strings.Builder
-	promptBuilder.WriteString("You are playing Dixit as the storyteller. Here are your cards:\n\n")
+	promptBuilder.WriteString("You are the storyteller in Dixit. Here are your cards:\n\n")
 	for i, desc := range descriptions {
 		promptBuilder.WriteString(fmt.Sprintf("Card %d: %s\n", i+1, desc))
 	}
 	promptBuilder.WriteString(fmt.Sprintf(`
-Pick ONE card (1-%d) and create a short, evocative clue (2-5 words).
-The clue should be abstract - use metaphor, emotion, or theme. Don't be too obvious.
+Your goal: give a clue so that SOME players guess your card, but not everyone (ideal: 1 to (players-2) correct guesses). You want an interesting split vote.
+
+Clue rules:
+- Do NOT literally describe the image or list objects ("a cat", "a tower", "a moon").
+- Do NOT mention colors or composition. No emojis, no quotes.
+- Use: metaphor, emotion, theme, atmosphere, contradiction, or a vague cultural echo (myth, proverb, story vibe).
+- Length: 2–4 words (max 4 words).
+
+Strategy:
+- If your chosen card feels very distinctive, pick a clue that could also fit 1–2 other cards.
+- If your hand is similar overall, pick a clue that subtly points to your card.
+
+Pick exactly ONE card (1-%d) and give exactly ONE clue.
 
 Respond in this format only:
 Card: [number]
@@ -178,12 +198,19 @@ func (c *OllamaClient) Submit(hand []CardWithThumb, clue string) (*SubmitRespons
 
 	// Stage 2: Ask text model to pick a card that matches the clue
 	var promptBuilder strings.Builder
-	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit. The clue is: \"%s\"\n\nHere are your cards:\n\n", clue))
+	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit (you are NOT the storyteller). The storyteller's clue is: \"%s\"\n\nYour cards:\n\n", clue))
 	for i, desc := range descriptions {
 		promptBuilder.WriteString(fmt.Sprintf("Card %d: %s\n", i+1, desc))
 	}
 	promptBuilder.WriteString(fmt.Sprintf(`
-Which card (1-%d) best matches the clue "%s"? Consider mood, theme, and symbolism.
+Your goal: submit ONE card (1-%d) that could attract votes as a believable match to the clue. You want to be a plausible decoy, not obviously the storyteller's card.
+
+Think: mood, symbolism, implied story, emotional tone. Interpret the clue as metaphor or theme, not literal description.
+- If the clue is abstract: pick a card with strong atmosphere or symbolism.
+- If the clue hints at a narrative: pick a card that suggests a similar story.
+- Avoid being too perfect (obvious) or too random (no one will vote for it).
+
+Which card do you submit?
 
 Respond with only the card number, like:
 Card: 2`, len(hand), clue))
@@ -220,7 +247,7 @@ func (c *OllamaClient) Vote(submissions []CardWithThumb, clue string, ownIndex i
 
 	// Stage 2: Ask text model to vote for the best matching card
 	var promptBuilder strings.Builder
-	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit. The clue is: \"%s\"\n\nHere are the cards on the table:\n\n", clue))
+	promptBuilder.WriteString(fmt.Sprintf("You are playing Dixit. The storyteller's clue is: \"%s\"\n\nCards on the table:\n\n", clue))
 	for i, desc := range descriptions {
 		if i+1 == ownIndex {
 			promptBuilder.WriteString(fmt.Sprintf("Card %d (YOUR CARD - you cannot vote for this): %s\n", i+1, desc))
@@ -229,11 +256,15 @@ func (c *OllamaClient) Vote(submissions []CardWithThumb, clue string, ownIndex i
 		}
 	}
 	promptBuilder.WriteString(fmt.Sprintf(`
-Which card (1-%d) do you think the storyteller originally chose for the clue "%s"?
-IMPORTANT: You cannot vote for Card %d (your own card).
+Vote for the card (1-%d) you think is the STORYTELLER'S card. You CANNOT vote for Card %d (your own card).
+
+How to decide:
+- Interpret the clue as the storyteller meant it: metaphor, mood, theme, indirect reference—not literal description.
+- Prefer the card that feels like it *inspired* the clue (creative, central, evocative) over one that merely "fits".
+- If several fit, choose the one with the most storyteller-like intent.
 
 Respond with only the card number, like:
-Card: 2`, len(submissions), clue, ownIndex))
+Card: 2`, len(submissions), ownIndex))
 
 	respBody, err := c.sendTextRequest(promptBuilder.String())
 	if err != nil {
@@ -268,8 +299,13 @@ Card: 2`, len(submissions), clue, ownIndex))
 	return &response, nil
 }
 
-// sendRequest sends a request to the Ollama API and returns the response text
+// sendRequest sends a request to the Ollama API and returns the response text.
+// Uses VisionMaxTokens for vision requests to keep descriptions short and fast.
 func (c *OllamaClient) sendRequest(content []interface{}) (string, error) {
+	maxTok := c.config.VisionMaxTokens
+	if maxTok <= 0 {
+		maxTok = c.config.MaxTokens
+	}
 	reqBody := ollamaRequest{
 		Model: c.config.Model,
 		Messages: []ollamaMessage{
@@ -278,7 +314,7 @@ func (c *OllamaClient) sendRequest(content []interface{}) (string, error) {
 				Content: content,
 			},
 		},
-		MaxTokens:   c.config.MaxTokens,
+		MaxTokens:   maxTok,
 		Temperature: c.config.Temperature,
 		Stream:      false,
 	}
@@ -394,26 +430,36 @@ func (c *OllamaClient) describeCard(card CardWithThumb) (string, error) {
 				Detail: "low",
 			},
 		},
-		ollamaTextContent{Type: "text", Text: "Describe this fantasy card image in 2-3 sentences. Focus on the main subject, mood, colors, and any symbols or themes."},
+		ollamaTextContent{Type: "text", Text: "In one short sentence describe this fantasy card: main subject, mood, key symbols, and the atmosphere or feeling it gives (e.g. dreamlike, ominous, hopeful). No literal list of objects—focus on what it evokes."},
 	}
 
 	return c.sendRequest(content)
 }
 
-// describeCards describes multiple cards and returns a formatted string
+// describeCards describes multiple cards in parallel (up to DescribeConcurrency at a time).
 func (c *OllamaClient) describeCards(cards []CardWithThumb) ([]string, error) {
 	descriptions := make([]string, len(cards))
-
-	for i, card := range cards {
-		desc, err := c.describeCard(card)
-		if err != nil {
-			// Use a fallback description if vision fails
-			descriptions[i] = "A fantasy illustration"
-		} else {
-			descriptions[i] = strings.TrimSpace(desc)
-		}
+	limit := c.config.DescribeConcurrency
+	if limit <= 0 {
+		limit = 4
 	}
-
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i, card := range cards {
+		wg.Add(1)
+		go func(idx int, card CardWithThumb) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			desc, err := c.describeCard(card)
+			if err != nil {
+				descriptions[idx] = "A fantasy illustration"
+			} else {
+				descriptions[idx] = strings.TrimSpace(desc)
+			}
+		}(i, card)
+	}
+	wg.Wait()
 	return descriptions, nil
 }
 
@@ -516,20 +562,19 @@ func extractClue(text string) string {
 	colonPattern := regexp.MustCompile(`(?i)clue(?:\s+is)?[:\s]+["']?([^"'\n]+)["']?`)
 	if matches := colonPattern.FindStringSubmatch(text); len(matches) > 1 {
 		clue := strings.TrimSpace(matches[1])
-		// Clean up any trailing punctuation
 		clue = strings.TrimRight(clue, ".,!?")
-		if len(clue) > 2 && len(clue) < 100 {
+		if len(clue) > 2 && len(clue) <= 120 {
 			return clue
 		}
 	}
 
-	// Pattern 3: Quoted text that looks like a clue (2-10 words)
-	quotePattern := regexp.MustCompile(`["']([^"']{5,50})["']`)
+	// Pattern 3: Quoted text that looks like a clue (2-4 words)
+	quotePattern := regexp.MustCompile(`["']([^"']{5,80})["']`)
 	if matches := quotePattern.FindAllStringSubmatch(text, -1); len(matches) > 0 {
 		for _, m := range matches {
 			clue := strings.TrimSpace(m[1])
 			words := strings.Fields(clue)
-			if len(words) >= 2 && len(words) <= 10 {
+			if len(words) >= 2 && len(words) <= 4 {
 				return clue
 			}
 		}
