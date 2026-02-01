@@ -48,7 +48,7 @@ func TestScoring_NobodyGuessesStoryteller(t *testing.T) {
 		"D": 1, // D votes for B's card
 	}
 
-	result := CalculateScores(storytellerID, submissions, votes, players)
+	result := CalculateScores(storytellerID, 0, submissions, votes, players)
 
 	// Nobody guessed: storyteller=0, others=2 each
 	if result.PointsThisRound["A"] != 0 {
@@ -71,7 +71,7 @@ func TestScoring_NobodyGuessesStoryteller(t *testing.T) {
 		"D": 1, // D votes for B's card (index 1)
 	}
 
-	result = CalculateScores(storytellerID, submissions, votes, players)
+	result = CalculateScores(storytellerID, 0, submissions, votes, players)
 
 	// Nobody guessed storyteller (index 0)
 	// Storyteller A: 0 base + 0 bonus = 0
@@ -108,12 +108,12 @@ func TestScoring_EverybodyGuessesStoryteller(t *testing.T) {
 		"D": 0,
 	}
 
-	result := CalculateScores(storytellerID, submissions, votes, players)
+	result := CalculateScores(storytellerID, 0, submissions, votes, players)
 
 	// Everybody guessed: storyteller=0, others=2 each
-	// But storyteller gets +3 bonus for receiving 3 votes
-	if result.PointsThisRound["A"] != 3 {
-		t.Errorf("Storyteller should get 3 (0 base + 3 bonus), got %d", result.PointsThisRound["A"])
+	// Storyteller does NOT get bonus points for votes on their card
+	if result.PointsThisRound["A"] != 0 {
+		t.Errorf("Storyteller should get 0 (no bonus for storyteller), got %d", result.PointsThisRound["A"])
 	}
 
 	// Others get 2 base, no bonus (nobody voted for their cards)
@@ -142,12 +142,12 @@ func TestScoring_MixedGuesses(t *testing.T) {
 		"D": 1, // Wrong - votes for B's card
 	}
 
-	result := CalculateScores(storytellerID, submissions, votes, players)
+	result := CalculateScores(storytellerID, 0, submissions, votes, players)
 
 	// Mixed: storyteller=3, correct guessers=3
-	// A (storyteller): 3 base + 1 bonus (B voted for A's card) = 4
-	if result.PointsThisRound["A"] != 4 {
-		t.Errorf("Storyteller should get 4 (3 base + 1 bonus), got %d", result.PointsThisRound["A"])
+	// A (storyteller): 3 base, no bonus (storyteller doesn't get vote bonus)
+	if result.PointsThisRound["A"] != 3 {
+		t.Errorf("Storyteller should get 3 (no bonus for storyteller), got %d", result.PointsThisRound["A"])
 	}
 
 	// B: 3 (correct guess) + 2 bonus (C and D voted for B's card) = 5
@@ -181,11 +181,11 @@ func TestScoring_VoteBonuses(t *testing.T) {
 		"E": 2, // Wrong - votes for C
 	}
 
-	result := CalculateScores(storytellerID, submissions, votes, players)
+	result := CalculateScores(storytellerID, 0, submissions, votes, players)
 
-	// A (storyteller): 3 base + 2 bonus (B and C voted for index 0) = 5
-	if result.PointsThisRound["A"] != 5 {
-		t.Errorf("A should get 5, got %d", result.PointsThisRound["A"])
+	// A (storyteller): 3 base, no bonus (storyteller doesn't get vote bonus)
+	if result.PointsThisRound["A"] != 3 {
+		t.Errorf("A should get 3, got %d", result.PointsThisRound["A"])
 	}
 
 	// B: 3 (correct) + 1 bonus (D voted for index 1) = 4
@@ -221,12 +221,12 @@ func TestScoring_ThreePlayerMinimum(t *testing.T) {
 		"C": 1, // Wrong - votes for B
 	}
 
-	result := CalculateScores(storytellerID, submissions, votes, players)
+	result := CalculateScores(storytellerID, 0, submissions, votes, players)
 
 	// Mixed result: A=3, B=3 (correct)
-	// A: 3 base + 1 bonus = 4
-	if result.PointsThisRound["A"] != 4 {
-		t.Errorf("A should get 4, got %d", result.PointsThisRound["A"])
+	// A: 3 base, no bonus (storyteller doesn't get vote bonus)
+	if result.PointsThisRound["A"] != 3 {
+		t.Errorf("A should get 3, got %d", result.PointsThisRound["A"])
 	}
 
 	// B: 3 (correct) + 1 bonus = 4

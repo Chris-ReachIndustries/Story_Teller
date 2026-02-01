@@ -13,12 +13,13 @@ type RoundResult struct {
 // - Additionally: each player gets +1 for each vote their submitted card received
 func CalculateScores(
 	storytellerID string,
-	submissions []Submission, // submissions[0] is always storyteller's card
+	storytellerCardIndex int, // Index of storyteller's card in shuffled submissions
+	submissions []Submission,
 	votes map[string]int, // playerID -> submissionIndex
 	players []*Player,
 ) *RoundResult {
 	result := &RoundResult{
-		StorytellerCardIndex: 0, // Storyteller's card is always at index 0 before shuffle
+		StorytellerCardIndex: storytellerCardIndex,
 		Votes:                votes,
 		PointsThisRound:      make(map[string]int),
 	}
@@ -28,7 +29,7 @@ func CalculateScores(
 		result.PointsThisRound[p.ID] = 0
 	}
 
-	// Count how many voted for storyteller's card (index 0)
+	// Count how many voted for storyteller's card
 	votesForStoryteller := 0
 	totalVoters := 0
 	for playerID, votedIdx := range votes {
@@ -36,7 +37,7 @@ func CalculateScores(
 			continue // Storyteller doesn't vote
 		}
 		totalVoters++
-		if votedIdx == 0 {
+		if votedIdx == storytellerCardIndex {
 			votesForStoryteller++
 		}
 	}
@@ -61,7 +62,7 @@ func CalculateScores(
 			if playerID == storytellerID {
 				continue
 			}
-			if votedIdx == 0 { // Voted for storyteller's card
+			if votedIdx == storytellerCardIndex {
 				result.PointsThisRound[playerID] += 3
 			}
 		}
